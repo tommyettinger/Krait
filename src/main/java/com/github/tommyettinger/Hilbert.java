@@ -110,10 +110,10 @@ public class Hilbert {
 
     /**
      * From http://and-what-happened.blogspot.nl/2011/08/fast-2d-and-3d-hilbert-curves-and.html
-     * @param point a Point3D in 1024^3 space
+     * @param point a Coord3D in 1024^3 space
      * @return a distance along the 3D Hilbert Curve
      */
-    public static int point3DToHilbert(final Point3D point) {
+    public static int point3DToHilbert(final Coord3D point) {
         return point3DToHilbert(point.getMorton());
     }
     /**
@@ -152,7 +152,7 @@ public class Hilbert {
      * @param hilbert a distance along the 3D Hilbert Curve
      * @return a 3D point in 1024^3 space.
      */
-    public static Point3D hilbertToPoint3D(final int hilbert) {
-        return Point3D.decodeMorton(hilbertToMorton(hilbert));
+    public static Coord3D hilbertToPoint3D(final int hilbert) {
+        return Coord3D.decodeMorton(hilbertToMorton(hilbert));
     }
 }

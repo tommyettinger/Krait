@@ -3,12 +3,12 @@ package com.github.tommyettinger;
 /**
  * Created by Tommy Ettinger on 10/18/2015.
  */
-public class Point3D {
+public class Coord3D {
     public int x;
     public int y;
     public int z;
 
-    public Point3D(int x, int y, int z)
+    public Coord3D(int x, int y, int z)
     {
         this.x = x;
         this.y = y;
@@ -49,7 +49,7 @@ public class Point3D {
         index3 &= 0x09249249;
         return( index1 | ( index2 << 1 ) | ( index3 << 2 ) );
     }
-    public static Point3D decodeMorton(final int morton)
+    public static Coord3D decodeMorton(final int morton)
     {
         // unpack 3 10-bit indices from a 30-bit Morton code
         int value1 = morton;
@@ -82,6 +82,6 @@ public class Point3D {
         value1 &= 0x000003ff;
         value2 &= 0x000003ff;
         value3 &= 0x000003ff;
-        return new Point3D(value1, value2, value3);
+        return new Coord3D(value1, value2, value3);
     }
 }
