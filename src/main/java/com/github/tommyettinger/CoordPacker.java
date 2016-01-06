@@ -113,7 +113,9 @@ public class CoordPacker {
             hilbertDistances = new short[0x10000], mooreX = new short[0x100], mooreY = new short[0x100],
             mooreDistances = new short[0x100], hilbert3X = new short[0x200], hilbert3Y = new short[0x200],
             hilbert3Z = new short[0x200], hilbert3Distances = new short[0x200],
+            ph3Distances = new short[64000],
             ALL_WALL = new short[0], ALL_ON = new short[]{0, -1};
+    public static byte[] ph3X = new byte[64000], ph3Y = new byte[64000], ph3Z = new byte[64000];
     /**
      * X positions for the Puka Curve, a 5x5x5 potential "atom" for Hilbert Curves.
      * One possible variant is http://i.imgur.com/IJzIkio.png
@@ -125,7 +127,7 @@ public class CoordPacker {
                     1, 1, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 3, 3, 4,
                     4, 4, 3, 3, 3, 4, 4, 3, 3, 4, 4, 3, 3, 2, 2, 2, 2, 2, 1, 1, 0, 0, 0, 0, 1, 1, 1,
                     0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0
-            };
+            }, pukaXreverse;
     /**
      * Y positions for the Puka Curve, a 5x5x5 potential "atom" for Hilbert Curves.
      * One possible variant is http://i.imgur.com/IJzIkio.png
@@ -137,7 +139,7 @@ public class CoordPacker {
                     3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2,
                     3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 3, 3, 2, 2, 3, 3, 4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 2,
                     2, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 0, 0, 0, 0, 0, 0
-            };
+            }, pukaYreverse;
     /**
      * Z positions for the Puka Curve, a 5x5x5 potential "atom" for Hilbert Curves.
      * One possible variant is http://i.imgur.com/IJzIkio.png
@@ -149,7 +151,7 @@ public class CoordPacker {
                     0, 1, 1, 1, 0, 0, 1, 1, 2, 3, 3, 4, 4, 3, 3, 3, 4, 4, 4, 3, 3, 4, 4, 3, 3, 2, 2,
                     2, 3, 3, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 4, 4, 3, 3, 4, 4, 3, 3, 4, 4, 3, 3, 4, 4,
                     4, 4, 4, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 3, 3, 4, 4
-            };
+            }, pukaZreverse;
     /**
      * Distances for the Puka Curve, a 5x5x5 potential "atom" for Hilbert Curves.
      * The distance for an x,y,z point is stored at a base-5 3-digit number for an index, so this index:
@@ -157,7 +159,7 @@ public class CoordPacker {
      * to get to that x,y,z position.
      * One possible variant of the Puka Curve is http://i.imgur.com/IJzIkio.png
      */
-    public static final byte[] pukaDistances = new byte[]
+    public static final short[] pukaDistances = new short[]
             {
                     0, 3, 120, 121, 124, 1, 2, 117, 112, 109, 58, 57, 116, 113, 108, 53, 56, 47,
                     104, 103, 52, 49, 48, 101, 102, 7, 4, 119, 122, 123, 6, 5, 118, 111, 110, 59,
@@ -167,7 +169,6 @@ public class CoordPacker {
                     85, 88, 89, 22, 19, 18, 73, 72, 21, 20, 17, 74, 75, 30, 29, 80, 77, 76, 31, 32,
                     81, 82, 91, 34, 33, 86, 87, 90
             };
-
 
     static {
         ClassLoader cl = CoordPacker.class.getClassLoader();
@@ -179,6 +180,15 @@ public class CoordPacker {
             hilbertY[i] = (short) c.y;
             hilbertDistances[c.x + (c.y << 8)] = (short) i;
         }
+        pukaXreverse = new byte[125];
+        pukaYreverse = new byte[125];
+        pukaZreverse = new byte[125];
+
+        for (int i = 0; i < 125; i++) {
+            pukaXreverse[i] = pukaX[124-i];
+            pukaYreverse[i] = pukaY[124-i];
+            pukaZreverse[i] = pukaZ[124-i];
+        }
 
         for (int x = 0; x < 8; x++) {
             for (int y = 0; y < 8; y++) {
@@ -187,6 +197,7 @@ public class CoordPacker {
                 }
             }
         }
+        computePukaHilbert3D();
 
         for (int i = 64; i < 128; i++) {
             mooreX[i - 64] = hilbertX[i];
@@ -3380,24 +3391,24 @@ public class CoordPacker {
     private static void computeHilbert3D(int x, int y, int z)
     {
         int hilbert = mortonEncode3D(x, y, z);
-            int block = 6;
-            int hcode = ( ( hilbert >> block ) & 7 );
-            int mcode, shift, signs;
-            shift = signs = 0;
-            while( block > 0 )
-            {
-                block -= 3;
-                hcode <<= 2;
-                mcode = ( ( 0x20212021 >> hcode ) & 3 );
-                shift = ( ( 0x48 >> ( 7 - shift - mcode ) ) & 3 );
-                signs = ( ( signs | ( signs << 3 ) ) >> mcode );
-                signs = ( ( signs ^ ( 0x53560300 >> hcode ) ) & 7 );
-                mcode = ( ( hilbert >> block ) & 7 );
-                hcode = mcode;
-                hcode = ( ( ( hcode | ( hcode << 3 ) ) >> shift ) & 7 );
-                hcode ^= signs;
-                hilbert ^= ( ( mcode ^ hcode ) << block );
-            }
+        int block = 6;
+        int hcode = ( ( hilbert >> block ) & 7 );
+        int mcode, shift, signs;
+        shift = signs = 0;
+        while( block > 0 )
+        {
+            block -= 3;
+            hcode <<= 2;
+            mcode = ( ( 0x20212021 >> hcode ) & 3 );
+            shift = ( ( 0x48 >> ( 7 - shift - mcode ) ) & 3 );
+            signs = ( ( signs | ( signs << 3 ) ) >> mcode );
+            signs = ( ( signs ^ ( 0x53560300 >> hcode ) ) & 7 );
+            mcode = ( ( hilbert >> block ) & 7 );
+            hcode = mcode;
+            hcode = ( ( ( hcode | ( hcode << 3 ) ) >> shift ) & 7 );
+            hcode ^= signs;
+            hilbert ^= ( ( mcode ^ hcode ) << block );
+        }
 
         hilbert ^= ( ( hilbert >> 1 ) & 0x92492492 );
         hilbert ^= ( ( hilbert & 0x92492492 ) >> 1 );
@@ -3406,7 +3417,154 @@ public class CoordPacker {
         hilbert3Y[hilbert] = (short)y;
         hilbert3Z[hilbert] = (short)z;
         hilbert3Distances[x + (y << 3) + (z << 6)] = (short)hilbert;
+    }
+    private static int nextGray(int gray)
+    {
+        return gray ^ (((Integer.bitCount(gray) & 1) == 1) ? (Integer.highestOneBit(gray & (-gray)) << 1) : 1);
+    }
+    private static int grayAxis(int gray)
+    {
+        // yes, that's octal. it occasionally is useful?
+        if((gray & 0444444444) > 0)
+            return 0; //x
+        else if((gray & 0222222222) > 0)
+            return 1; //y
+        return 2; //z
+    }
 
+    private static int getDim(int element, int x, int y, int z) {
+        switch (element) {
+            case 0:
+                return x;
+            case 1:
+                return y;
+            default:
+                return z;
+        }
+    }
+    private static int[] g_mask = new int[]{4,2,1};
+
+    /**
+     * See http://www.dcs.bbk.ac.uk/TriStarp/pubs/JL1_00.pdf
+     * @param i ???
+     * @param x ????
+     * @param y ?????
+     * @param z ??????
+     * @return ???????????????????????
+     */
+    private static int calc_P (int i, int x, int y, int z)
+    {
+        int element= i / 0x3;
+        int P, temp1, temp2;
+        P = getDim(element, x, y, z);
+        if (i % 0x3 > 0x3 - 03)
+        {
+            temp1 = P = getDim(element + 1, x, y, z);
+            P >>= i % 0x3;
+            temp1 <<= 0x3 - i % 0x3;
+            P |= temp1;
+        }
+        else
+            P >>= i % 0x3; /* P is a 03 bit hcode */
+        return P;
+    }
+    private static int calc_J (int P)
+    {
+        int i = 0;
+        int J = 03;
+        for (i = 1; i < 03; i++) {
+            if ((P >> i & 1) != (P & 1))
+                break;
+        }
+        if (i != 03)
+            J -= i;
+        return J;
+    }
+    private static int calc_T (int P)
+    {
+        if (P < 3)
+            return 0;
+        if (P % 2 > 0)
+            return (P - 1) ^ (P - 1) / 2;
+        return (P - 2) ^ (P - 2) / 2;
+    }
+    private  static int calc_tS_tT(int xJ, int val)
+    {
+        int retval = val, temp1, temp2;
+        if (xJ % 03 != 0)
+        {
+            temp1 = val >> xJ % 03;
+            temp2 = val << 03 - xJ % 03;
+            retval = temp1 | temp2;
+            retval &= ((int)1 << 03) - 1;
+        }
+        return retval;
+    }
+
+    int H_encode(int x, int y, int z) {
+        int mask = (int) 1 << 0x3 - 1, W = 0, P = 0, h = 0, i = 0x3 * 03 - 03,
+                A, S, tS, T, tT, J, xJ, j;
+        for (j = A = 0; j < 03; j++)
+            if ((getDim(j, x, y, z) & mask) > 0)
+                A |= g_mask[j];
+        S = A;
+        P = grayEncode(S); // gray code
+        h |= P << i;
+        J = calc_J(P);
+        xJ = J - 1;
+        T = calc_T(P);
+        tT = T;
+        for (i -= 03, mask >>= 1; i >= 0; i -= 03, mask >>= 1) {
+            for (j = A = 0; j < 03; j++) {
+                if ((getDim(j, x, y, z) & mask) > 0)
+                    A |= g_mask[j];
+            }
+            W ^= tT;
+            tS = A ^ W;
+            S = calc_tS_tT(xJ, tS);
+            P = grayEncode(S);
+
+            h |= P << i;
+
+            if (i > 0) {
+                T = calc_T(P);
+                tT = calc_tS_tT(xJ, T);
+                J = calc_J(P);
+                xJ += J - 1;
+            }
+        }
+        return h;
+    }
+
+
+    private static void computePukaHilbert3D() {
+        System.arraycopy(pukaX, 0, ph3X, 0, 125);
+        System.arraycopy(pukaY, 0, ph3Y, 0, 125);
+        System.arraycopy(pukaZ, 0, ph3Z, 0, 125);
+        System.arraycopy(pukaDistances, 0, ph3Distances, 0, 125);
+
+        System.arraycopy(pukaX, 0, ph3X, 0, 125);
+        System.arraycopy(pukaY, 0, ph3Y, 0, 125);
+        System.arraycopy(pukaZreverse, 0, ph3Z, 510 * 125, 125);
+        for (int i = 510 * 125, h = 0; i < 511 * 125; i++, h++) {
+            ph3X[i] = pukaX[h];
+            ph3Y[i] = pukaY[h];
+            ph3Z[i] = (byte)(pukaZ[h] + 35);
+            ph3Distances[(ph3X[i] << 25) | (ph3Y[i] << 5) | ph3Z[i]] = (short)i;
+        }
+        int x0 = 0, y0 = 0, z0 = 0, x1, y1, z1, x2, y2, z2;
+        for (int h = 1; h < 0x200 - 1; h++) {
+            x0 = hilbert3X[h-1];
+            y0 = hilbert3Y[h-1];
+            z0 = hilbert3Z[h-1];
+            x1 = hilbert3X[h];
+            y1 = hilbert3Y[h];
+            z1 = hilbert3Z[h];
+            x2 = hilbert3X[h+1];
+            z2 = hilbert3Y[h+1];
+            z2 = hilbert3Z[h+1];
+
+        }
     }
 
     /**
