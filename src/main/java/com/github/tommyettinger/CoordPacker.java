@@ -111,8 +111,8 @@ public class CoordPacker {
 
     public static short[] hilbertX = new short[0x10000], hilbertY = new short[0x10000],
             hilbertDistances = new short[0x10000], mooreX = new short[0x100], mooreY = new short[0x100],
-            mooreDistances = new short[0x100], hilbert3X = new short[0x200], hilbert3Y = new short[0x200],
-            hilbert3Z = new short[0x200], hilbert3Distances = new short[0x200],
+            mooreDistances = new short[0x100], hilbert3X = new short[0x1000], hilbert3Y = new short[0x1000],
+            hilbert3Z = new short[0x1000], hilbert3Distances = new short[0x1000],
             ph3Distances = new short[64000],
             ALL_WALL = new short[0], ALL_ON = new short[]{0, -1};
     public static byte[] ph3X = new byte[64000], ph3Y = new byte[64000], ph3Z = new byte[64000];
@@ -152,6 +152,7 @@ public class CoordPacker {
                     2, 3, 3, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 4, 4, 3, 3, 4, 4, 3, 3, 4, 4, 3, 3, 4, 4,
                     4, 4, 4, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 3, 3, 4, 4
             }, pukaZreverse;
+    public static final byte[][][] pukaRotations;
     /**
      * Distances for the Puka Curve, a 5x5x5 potential "atom" for Hilbert Curves.
      * The distance for an x,y,z point is stored at a base-5 3-digit number for an index, so this index:
@@ -190,13 +191,90 @@ public class CoordPacker {
             pukaZreverse[i] = pukaZ[124-i];
         }
 
-        for (int x = 0; x < 8; x++) {
-            for (int y = 0; y < 8; y++) {
-                for (int z = 0; z < 8; z++) {
+        for (int x = 0; x < 16; x++) {
+            for (int y = 0; y < 16; y++) {
+                for (int z = 0; z < 16; z++) {
                     computeHilbert3D(x, y, z);
                 }
             }
         }
+
+        pukaRotations = new byte[][][]{
+                new byte[][]{ // 0
+                        pukaZ, pukaX, pukaY
+                },
+                new byte[][]{ // 1
+                        pukaZ, pukaYreverse, pukaX
+                },
+                new byte[][]{ // 2
+                        pukaZ, pukaXreverse, pukaYreverse
+                },
+                new byte[][]{ // 3
+                        pukaZ, pukaY, pukaXreverse
+                },
+                new byte[][]{ // 4
+                        pukaX, pukaZ, pukaY
+                },
+                new byte[][]{ // 5
+                        pukaYreverse, pukaZ, pukaX
+                },
+                new byte[][]{ // 6
+                        pukaXreverse, pukaZ, pukaYreverse
+                },
+                new byte[][]{ // 7
+                        pukaY, pukaZ, pukaYreverse
+                },
+                new byte[][]{ // 8
+                        pukaX, pukaY, pukaZ
+                },
+                new byte[][]{ // 9
+                        pukaYreverse, pukaX, pukaZ
+                },
+                new byte[][]{ // 10
+                        pukaXreverse, pukaYreverse, pukaZ
+                },
+                new byte[][]{ // 11
+                        pukaY, pukaXreverse, pukaZ
+                },
+                new byte[][]{ // 12
+                        pukaZreverse, pukaX, pukaY
+                },
+                new byte[][]{ // 13
+                        pukaZreverse, pukaYreverse, pukaX
+                },
+                new byte[][]{ // 14
+                        pukaZreverse, pukaXreverse, pukaYreverse
+                },
+                new byte[][]{ // 15
+                        pukaZreverse, pukaY, pukaXreverse
+                },
+                new byte[][]{ // 16
+                        pukaX, pukaZreverse, pukaY
+                },
+                new byte[][]{ // 17
+                        pukaYreverse, pukaZreverse, pukaX
+                },
+                new byte[][]{ // 18
+                        pukaXreverse, pukaZreverse, pukaYreverse
+                },
+                new byte[][]{ // 19
+                        pukaY, pukaZreverse, pukaYreverse
+                },
+                new byte[][]{ // 20
+                        pukaX, pukaY, pukaZreverse
+                },
+                new byte[][]{ // 21
+                        pukaYreverse, pukaX, pukaZreverse
+                },
+                new byte[][]{ // 22
+                        pukaXreverse, pukaYreverse, pukaZreverse
+                },
+                new byte[][]{ // 23
+                        pukaY, pukaXreverse, pukaZreverse
+                }
+        };
+
+
         computePukaHilbert3D();
 
         for (int i = 64; i < 128; i++) {
@@ -3543,27 +3621,43 @@ public class CoordPacker {
         System.arraycopy(pukaZ, 0, ph3Z, 0, 125);
         System.arraycopy(pukaDistances, 0, ph3Distances, 0, 125);
 
-        System.arraycopy(pukaX, 0, ph3X, 0, 125);
-        System.arraycopy(pukaY, 0, ph3Y, 0, 125);
-        System.arraycopy(pukaZreverse, 0, ph3Z, 510 * 125, 125);
-        for (int i = 510 * 125, h = 0; i < 511 * 125; i++, h++) {
-            ph3X[i] = pukaX[h];
-            ph3Y[i] = pukaY[h];
-            ph3Z[i] = (byte)(pukaZ[h] + 35);
-            ph3Distances[(ph3X[i] << 25) | (ph3Y[i] << 5) | ph3Z[i]] = (short)i;
-        }
-        int x0 = 0, y0 = 0, z0 = 0, x1, y1, z1, x2, y2, z2;
-        for (int h = 1; h < 0x200 - 1; h++) {
-            x0 = hilbert3X[h-1];
-            y0 = hilbert3Y[h-1];
-            z0 = hilbert3Z[h-1];
-            x1 = hilbert3X[h];
-            y1 = hilbert3Y[h];
-            z1 = hilbert3Z[h];
-            x2 = hilbert3X[h+1];
-            z2 = hilbert3Y[h+1];
-            z2 = hilbert3Z[h+1];
-
+        for (int h = 0, p = 0; h < 0x1000; h += 8, p += 125) {
+            int startX = hilbert3X[h], startY = hilbert3Y[h], startZ = hilbert3Z[h],
+                    endX = hilbert3X[h+7], endY = hilbert3Y[h+7], endZ = hilbert3Z[h+7],
+                    bottomX = startX >> 1, bottomY = startY >> 1, bottomZ = startZ >> 1;
+            int direction, rotation;
+            if(startX > endX) {
+                direction = 0;
+                rotation = ((startZ & 1) << 2) | (startY & 1);
+            }
+            else if(startX < endX) {
+                direction = 3;
+                rotation = ((startZ & 1) << 2) | (startY & 1);
+            }
+            else if(startY > endY) {
+                direction = 1;
+                rotation = ((startZ & 1) << 2) | (startX & 1);
+            }
+            else if(startY < endY) {
+                direction = 4;
+                rotation = ((startZ & 1) << 2) | (startX & 1);
+            }
+            else if(startZ > endZ) {
+                direction = 2;
+                rotation = ((startY & 1) << 2) | (startX & 1);
+            }
+            else {
+                direction = 5;
+                rotation = ((startY & 1) << 2) | (startX & 1);
+            }
+            rotation = rotation ^ (rotation >> 1);
+            byte x, y, z;
+            for (int i = 0; i < 125; i++) {
+                ph3X[p + i] = x = (byte)(pukaRotations[direction * 4 + rotation][0][i] + bottomX * 5);
+                ph3Y[p + i] = y = (byte)(pukaRotations[direction * 4 + rotation][1][i] + bottomY * 5);
+                ph3Z[p + i] = z = (byte)(pukaRotations[direction * 4 + rotation][2][i] + bottomZ * 5);
+                ph3Distances[x * 1600 + y * 40 + z] = (short)(p + i);
+            }
         }
     }
 
