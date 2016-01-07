@@ -73,7 +73,7 @@ import java.util.Arrays;
  * loop, crossing the path it walked, or moving in any direction but one cell up, down, left, or right. The shape
  * of the path this takes has the useful property of keeping most groups of cells walked through with similar x and
  * y at similar distances traveled from the start of the curve, and most groups of cells with very dissimilar x and
- * y at very different distances traveled. Since FOV and several other things you might want to encode with CoordPacker
+ * y at very different distances traveled. Since FOV and several other things you might want to encode with RegionPacker
  * tends to be clustered in small areas and occupy more complicated shapes than straight lines due to dungeon layout
  * blocking sections of FOV, the simplest paths of a wide zigzag from side-to-side, or an outward-going-in spiral, have
  * rather poor behavior when determining how much of an area they pass through contiguously. The contiguous area trait
@@ -102,10 +102,20 @@ import java.util.Arrays;
  * machines), and since there hasn't been anything with better spatial properties discovered yet, this technique should
  * remain useful for some time.
  * <br>
+ * One contribution this class makes to the large amount of resources already present for space-filling curves is the
+ * Puka Curve, a 5x5x5 potential "atom" for Hilbert Curves. This means it can replace an order-1 3D Hilbert Curve as
+ * the building block for larger 3D Hilbert Curves, changing the size of an order-n curve made of Hilbert Curves as
+ * atoms from a side length of 2 raised to the n, to a side length of 2 raised to the (n minus 1) times 5. An order-4
+ * Hilbert Curve with the Hilbert atoms replaced with Puka atoms (thus having a side length of 40) is supplied here as
+ * the Puka-Hilbert Curve, or PH Curve. You can fetch x, y, and z positions for distances from it using the fields ph3X,
+ * ph3Y, and ph3Z. You can fetch distances as unsigned shorts given a coded x, y, z index; the distance for an x,y,z
+ * point is stored with x in the most significant position, y in the middle, and z as least significant, so this index:
+ * {@code ph3Distances[x * 1600 + y * 40 + z]} will equal the distance to travel along the PH Curve to get to that
+ * x,y,z position. One possible variant of the Puka Curve is http://i.imgur.com/IJzIkio.png
  * Created by Tommy Ettinger on 10/1/2015.
  * @author Tommy Ettinger
  */
-public class CoordPacker {
+public class RegionPacker {
     public static final int DEPTH = 8;
     private static final int BITS = DEPTH << 1;
 
@@ -153,30 +163,13 @@ public class CoordPacker {
                     4, 4, 4, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 3, 3, 4, 4
             }, pukaZreverse;
     public static final byte[][][] pukaRotations;
-    /**
-     * Distances for the Puka Curve, a 5x5x5 potential "atom" for Hilbert Curves.
-     * The distance for an x,y,z point is stored at a base-5 3-digit number for an index, so this index:
-     * {@code pukaDistances[x * 25 + y * 5 + z]} will equal the distance to travel along the Puka curve
-     * to get to that x,y,z position.
-     * One possible variant of the Puka Curve is http://i.imgur.com/IJzIkio.png
-     */
-    public static final short[] pukaDistances = new short[]
-            {
-                    0, 3, 120, 121, 124, 1, 2, 117, 112, 109, 58, 57, 116, 113, 108, 53, 56, 47,
-                    104, 103, 52, 49, 48, 101, 102, 7, 4, 119, 122, 123, 6, 5, 118, 111, 110, 59,
-                    60, 115, 114, 107, 54, 55, 46, 105, 106, 51, 50, 45, 100, 99, 8, 9, 14, 67, 66,
-                    25, 12, 13, 65, 26, 61, 62, 94, 39, 42, 43, 96, 95, 40, 41, 44, 97, 98, 23, 10,
-                    15, 68, 71, 24, 11, 16, 69, 70, 27, 28, 79, 78, 93, 38, 37, 84, 83, 92, 35, 36,
-                    85, 88, 89, 22, 19, 18, 73, 72, 21, 20, 17, 74, 75, 30, 29, 80, 77, 76, 31, 32,
-                    81, 82, 91, 34, 33, 86, 87, 90
-            };
 
     static {
-        ClassLoader cl = CoordPacker.class.getClassLoader();
+        ClassLoader cl = RegionPacker.class.getClassLoader();
 
         Coord c;
         for (int i = 0; i < 0x10000; i++) {
-            c = CoordPacker.hilbertToCoordNoLUT(i);
+            c = RegionPacker.hilbertToCoordNoLUT(i);
             hilbertX[i] = (short) c.x;
             hilbertY[i] = (short) c.y;
             hilbertDistances[c.x + (c.y << 8)] = (short) i;
@@ -186,9 +179,9 @@ public class CoordPacker {
         pukaZreverse = new byte[125];
 
         for (int i = 0; i < 125; i++) {
-            pukaXreverse[i] = pukaX[124-i];
-            pukaYreverse[i] = pukaY[124-i];
-            pukaZreverse[i] = pukaZ[124-i];
+            pukaXreverse[i] = (byte)(4 - pukaX[i]);
+            pukaYreverse[i] = (byte)(4 - pukaY[i]);
+            pukaZreverse[i] = (byte)(4 - pukaZ[i]);
         }
 
         for (int x = 0; x < 16; x++) {
@@ -258,7 +251,7 @@ public class CoordPacker {
                         pukaXreverse, pukaZreverse, pukaYreverse
                 },
                 new byte[][]{ // 19
-                        pukaY, pukaZreverse, pukaYreverse
+                        pukaY, pukaZreverse, pukaXreverse
                 },
                 new byte[][]{ // 20
                         pukaX, pukaY, pukaZreverse
@@ -299,7 +292,7 @@ public class CoordPacker {
     /**
      * Compresses a double[][] that only stores two
      * relevant states (one of which should be 0 or less, the other greater than 0), returning a short[] as described in
-     * the {@link CoordPacker} class documentation. This short[] can be passed to CoordPacker.unpack() to restore the
+     * the {@link RegionPacker} class documentation. This short[] can be passed to RegionPacker.unpack() to restore the
      * relevant states and their positions as a boolean[][] (with false meaning 0 or less and true being any double
      * greater than 0). As stated in the class documentation, the compressed result is intended to use as little memory
      * as possible for 2D arrays with contiguous areas of "on" cells.
@@ -313,7 +306,7 @@ public class CoordPacker {
     public static short[] pack(double[][] map)
     {
         if(map == null || map.length == 0)
-            throw new ArrayIndexOutOfBoundsException("CoordPacker.pack() must be given a non-empty array");
+            throw new ArrayIndexOutOfBoundsException("RegionPacker.pack() must be given a non-empty array");
         int xSize = map.length, ySize = map[0].length;
         if(xSize > 256 || ySize > 256)
             throw new UnsupportedOperationException("Map size is too large to efficiently pack, aborting");
@@ -369,8 +362,8 @@ public class CoordPacker {
 
     /**
      * Compresses a double[][] that only stores two relevant states (one of which should be equal to or less than
-     * threshold, the other greater than threshold), returning a short[] as described in the {@link CoordPacker} class
-     * documentation. This short[] can be passed to CoordPacker.unpack() to restore the relevant states and their
+     * threshold, the other greater than threshold), returning a short[] as described in the {@link RegionPacker} class
+     * documentation. This short[] can be passed to RegionPacker.unpack() to restore the relevant states and their
      * positions as a boolean[][] (with true meaning threshold or less and false being any double greater than
      * threshold). As stated in the class documentation, the compressed result is intended to use as little memory as
      * possible for 2D arrays with contiguous areas of "on" cells.
@@ -384,7 +377,7 @@ public class CoordPacker {
     public static short[] pack(double[][] map, double threshold)
     {
         if(map == null || map.length == 0)
-            throw new ArrayIndexOutOfBoundsException("CoordPacker.pack() must be given a non-empty array");
+            throw new ArrayIndexOutOfBoundsException("RegionPacker.pack() must be given a non-empty array");
         int xSize = map.length, ySize = map[0].length;
         if(xSize > 256 || ySize > 256)
             throw new UnsupportedOperationException("Map size is too large to efficiently pack, aborting");
@@ -441,7 +434,7 @@ public class CoordPacker {
     /**
      * Compresses a byte[][] (typically one generated by an FOV-like method) that only stores two
      * relevant states (one of which should be 0 or less, the other greater than 0), returning a short[] as described in
-     * the {@link CoordPacker} class documentation. This short[] can be passed to CoordPacker.unpack() to restore the
+     * the {@link RegionPacker} class documentation. This short[] can be passed to RegionPacker.unpack() to restore the
      * relevant states and their positions as a boolean[][] (with false meaning 0 or less and true being any byte
      * greater than 0). As stated in the class documentation, the compressed result is intended to use as little memory
      * as possible for 2D arrays with contiguous areas of "on" cells.
@@ -454,7 +447,7 @@ public class CoordPacker {
     public static short[] pack(byte[][] map)
     {
         if(map == null || map.length == 0)
-            throw new ArrayIndexOutOfBoundsException("CoordPacker.pack() must be given a non-empty array");
+            throw new ArrayIndexOutOfBoundsException("RegionPacker.pack() must be given a non-empty array");
         int xSize = map.length, ySize = map[0].length;
         if(xSize > 256 || ySize > 256)
             throw new UnsupportedOperationException("Map size is too large to efficiently pack, aborting");
@@ -509,8 +502,8 @@ public class CoordPacker {
     }
 
     /**
-     * Compresses a boolean[][], returning a short[] as described in the {@link CoordPacker} class documentation. This
-     * short[] can be passed to CoordPacker.unpack() to restore the relevant states and their positions as a boolean[][]
+     * Compresses a boolean[][], returning a short[] as described in the {@link RegionPacker} class documentation. This
+     * short[] can be passed to RegionPacker.unpack() to restore the relevant states and their positions as a boolean[][]
      * As stated in the class documentation, the compressed result is intended to use as little memory as possible for
      * 2D arrays with contiguous areas of "on" cells.
      *
@@ -520,7 +513,7 @@ public class CoordPacker {
     public static short[] pack(boolean[][] map)
     {
         if(map == null || map.length == 0)
-            throw new ArrayIndexOutOfBoundsException("CoordPacker.pack() must be given a non-empty array");
+            throw new ArrayIndexOutOfBoundsException("RegionPacker.pack() must be given a non-empty array");
         int xSize = map.length, ySize = map[0].length;
         if(xSize > 256 || ySize > 256)
             throw new UnsupportedOperationException("Map size is too large to efficiently pack, aborting");
@@ -576,7 +569,7 @@ public class CoordPacker {
     /**
      * Compresses a char[][] (typically one generated by a map generating method) sp only the cells that equal the yes
      * parameter will be encoded as "on", returning a short[] as described in
-     * the {@link CoordPacker} class documentation. This short[] can be passed to CoordPacker.unpack() to restore the
+     * the {@link RegionPacker} class documentation. This short[] can be passed to RegionPacker.unpack() to restore the
      * positions of chars that equal the parameter yes as a boolean[][] (with false meaning not equal and true equal to
      * yes). As stated in the class documentation, the compressed result is intended to use as little memory
      * as possible for 2D arrays with contiguous areas of "on" cells.
@@ -588,7 +581,7 @@ public class CoordPacker {
     public static short[] pack(char[][] map, char yes)
     {
         if(map == null || map.length == 0)
-            throw new ArrayIndexOutOfBoundsException("CoordPacker.pack() must be given a non-empty array");
+            throw new ArrayIndexOutOfBoundsException("RegionPacker.pack() must be given a non-empty array");
         int xSize = map.length, ySize = map[0].length;
         if(xSize > 256 || ySize > 256)
             throw new UnsupportedOperationException("Map size is too large to efficiently pack, aborting");
@@ -705,10 +698,10 @@ public class CoordPacker {
     /**
      * Compresses a double[][] that stores any number of
      * states and a double[] storing up to 63 states, ordered from lowest to highest, returning a short[][] as described
-     * in the {@link CoordPacker} class documentation. This short[][] can be passed to CoordPacker.unpackMultiDouble()
+     * in the {@link RegionPacker} class documentation. This short[][] can be passed to RegionPacker.unpackMultiDouble()
      * to restore the state at a position to the nearest state in levels, rounded down, and return a double[][] that
      * should preserve the states as closely as intended for most purposes. <b>For compressing FOV, you should generate
-     * levels with CoordPacker.generatePackingLevels()</b> instead of manually creating the array, because some
+     * levels with RegionPacker.generatePackingLevels()</b> instead of manually creating the array, because some
      * imprecision is inherent in floating point math and comparisons are often incorrect between FOV with multiple
      * levels and exact levels generated as simply as possible. generatePackingLevels() adds a small correction to the
      * levels to compensate for floating-point math issues, which shouldn't affect the correctness of the results for
@@ -742,7 +735,7 @@ public class CoordPacker {
                     "Too many levels to efficiently pack; should be less than 64 but was given " +
                             levels.length);
         if (map == null || map.length == 0)
-            throw new ArrayIndexOutOfBoundsException("CoordPacker.packMulti() must be given a non-empty array");
+            throw new ArrayIndexOutOfBoundsException("RegionPacker.packMulti() must be given a non-empty array");
         int xSize = map.length, ySize = map[0].length;
         if (xSize > 256 || ySize > 256)
             throw new UnsupportedOperationException("Map size is too large to efficiently pack, aborting");
@@ -814,8 +807,8 @@ public class CoordPacker {
 
     /**
      * Compresses a byte[][] that stores any number
-     * of states and an int no more than 63, returning a short[][] as described in the {@link CoordPacker} class
-     * documentation. This short[][] can be passed to CoordPacker.unpackMultiByte() to restore the state at a position
+     * of states and an int no more than 63, returning a short[][] as described in the {@link RegionPacker} class
+     * documentation. This short[][] can be passed to RegionPacker.unpackMultiByte() to restore the state at a position
      * to the nearest state possible, capped at levelCount, and return a byte[][] that should preserve the states as
      * closely as intended for most purposes.
      *<br>
@@ -834,7 +827,7 @@ public class CoordPacker {
      */
     public static short[][] packMulti(byte[][] map, int levelCount) {
         if (map == null || map.length == 0)
-            throw new ArrayIndexOutOfBoundsException("CoordPacker.packMulti() must be given a non-empty array");
+            throw new ArrayIndexOutOfBoundsException("RegionPacker.packMulti() must be given a non-empty array");
         if (levelCount > 63)
             throw new UnsupportedOperationException(
                     "Too many levels to efficiently pack; should be less than 64 but was given " +
@@ -913,7 +906,7 @@ public class CoordPacker {
 
     /**
      * Decompresses a short[] returned by pack() or a sub-array of a short[][] returned by packMulti(), as described in
-     * the {@link CoordPacker} class documentation. This returns a boolean[][] that stores the same values that were
+     * the {@link RegionPacker} class documentation. This returns a boolean[][] that stores the same values that were
      * packed if the overload of pack() taking a boolean[][] was used. If a double[][] was compressed with pack(), the
      * boolean[][] this returns will have true for all values greater than 0 and false for all others. If this is one
      * of the sub-arrays compressed by packMulti(), the index of the sub-array will correspond to an index in the levels
@@ -928,7 +921,7 @@ public class CoordPacker {
     public static boolean[][] unpack(short[] packed, int width, int height)
     {
         if(packed == null)
-            throw new ArrayIndexOutOfBoundsException("CoordPacker.unpack() must be given a non-null array");
+            throw new ArrayIndexOutOfBoundsException("RegionPacker.unpack() must be given a non-null array");
         boolean[][] unpacked = new boolean[width][height];
         if(packed.length == 0)
             return unpacked;
@@ -953,7 +946,7 @@ public class CoordPacker {
 
     /**
      * Decompresses a short[] returned by pack() or a sub-array of a short[][] returned by packMulti(), as described in
-     * the {@link CoordPacker} class documentation. This returns a double[][] that stores 1.0 for true and 0.0 for
+     * the {@link RegionPacker} class documentation. This returns a double[][] that stores 1.0 for true and 0.0 for
      * false if the overload of pack() taking a boolean[][] was used. If a double[][] was compressed with pack(), the
      * double[][] this returns will have 1.0 for all values greater than 0 and 0.0 for all others. If this is one
      * of the sub-arrays compressed by packMulti(), the index of the sub-array will correspond to an index in the levels
@@ -968,7 +961,7 @@ public class CoordPacker {
     public static double[][] unpackDouble(short[] packed, int width, int height)
     {
         if(packed == null)
-            throw new ArrayIndexOutOfBoundsException("CoordPacker.unpack() must be given a non-null array");
+            throw new ArrayIndexOutOfBoundsException("RegionPacker.unpack() must be given a non-null array");
         double[][] unpacked = new double[width][height];
         if(packed.length == 0)
             return unpacked;
@@ -993,7 +986,7 @@ public class CoordPacker {
 
     /**
      * Decompresses a short[] returned by pack() or a sub-array of a short[][] returned by packMulti(), as described in
-     * the {@link CoordPacker} class documentation. This returns a double[][] that stores 1.0 for true and 0.0 for
+     * the {@link RegionPacker} class documentation. This returns a double[][] that stores 1.0 for true and 0.0 for
      * false if the overload of pack() taking a boolean[][] was used. If a double[][] was compressed with pack(), the
      * double[][] this returns will have 1.0 for all values greater than 0 and 0.0 for all others. If this is one
      * of the sub-arrays compressed by packMulti(), the index of the sub-array will correspond to an index in the levels
@@ -1009,7 +1002,7 @@ public class CoordPacker {
                                                  double angle, double span)
     {
         if(packed == null)
-            throw new ArrayIndexOutOfBoundsException("CoordPacker.unpack() must be given a non-null array");
+            throw new ArrayIndexOutOfBoundsException("RegionPacker.unpack() must be given a non-null array");
         double[][] unpacked = new double[width][height];
         if(packed.length == 0)
             return unpacked;
@@ -1041,7 +1034,7 @@ public class CoordPacker {
 
     /**
      * Decompresses a short[][] returned by packMulti() and produces an approximation of the double[][] it compressed
-     * using the given levels double[] as the values to assign, as described in the {@link CoordPacker} class
+     * using the given levels double[] as the values to assign, as described in the {@link RegionPacker} class
      * documentation. The length of levels and the length of the outer array of packed must be equal. However, the
      * levels array passed to this method should not be identical to the levels array passed to packMulti(); for FOV
      * compression, you should get an array for levels using generatePackingLevels(), but for decompression, you should
@@ -1063,12 +1056,12 @@ public class CoordPacker {
     {
         if(packed == null || packed.length == 0)
             throw new ArrayIndexOutOfBoundsException(
-                    "CoordPacker.unpackMultiDouble() must be given a non-empty array");
+                    "RegionPacker.unpackMultiDouble() must be given a non-empty array");
         if (levels == null || levels.length != packed.length)
             throw new UnsupportedOperationException("The lengths of packed and levels must be equal");
         if (levels.length > 63)
             throw new UnsupportedOperationException(
-                    "Too many levels to be packed by CoordPacker; should be less than 64 but was given " +
+                    "Too many levels to be packed by RegionPacker; should be less than 64 but was given " +
                             levels.length);
         double[][] unpacked = new double[width][height];
         short x= 0, y = 0;
@@ -1095,7 +1088,7 @@ public class CoordPacker {
     /**
      * Decompresses a short[][] returned by packMulti() and produces an approximation of the double[][] it compressed
      * using the given levels double[] as the values to assign, but only using the innermost indices up to limit, as
-     * described in the {@link CoordPacker} class documentation. The length of levels and the length of the outer array
+     * described in the {@link RegionPacker} class documentation. The length of levels and the length of the outer array
      * of packed do not have to be equal. However, the levels array passed to this method should not be identical to the
      * levels array passed to packMulti(); for FOV compression, you should get an array for levels using
      * generatePackingLevels(), but for decompression, you should create levels using generateLightLevels(), which
@@ -1119,12 +1112,12 @@ public class CoordPacker {
     {
         if(packed == null || packed.length == 0)
             throw new ArrayIndexOutOfBoundsException(
-                    "CoordPacker.unpackMultiDouble() must be given a non-empty array");
+                    "RegionPacker.unpackMultiDouble() must be given a non-empty array");
         if (levels == null || levels.length != packed.length)
             throw new UnsupportedOperationException("The lengths of packed and levels must be equal");
         if (levels.length > 63)
             throw new UnsupportedOperationException(
-                    "Too many levels to be packed by CoordPacker; should be less than 64 but was given " +
+                    "Too many levels to be packed by RegionPacker; should be less than 64 but was given " +
                             levels.length);
         if(limit > levels.length)
             limit = levels.length;
@@ -1153,7 +1146,7 @@ public class CoordPacker {
     /**
      * Decompresses a short[][] returned by packMulti() and produces an approximation of the double[][] it compressed
      * using the given levels double[] as the values to assign, but only using the innermost indices up to limit, as
-     * described in the {@link CoordPacker} class documentation. The length of levels and the length of the outer array
+     * described in the {@link RegionPacker} class documentation. The length of levels and the length of the outer array
      * of packed do not have to be equal. However, the levels array passed to this method should not be identical to the
      * levels array passed to packMulti(); for FOV compression, you should get an array for levels using
      * generatePackingLevels(), but for decompression, you should create levels using generateLightLevels(), which
@@ -1184,12 +1177,12 @@ public class CoordPacker {
     {
         if(packed == null || packed.length == 0)
             throw new ArrayIndexOutOfBoundsException(
-                    "CoordPacker.unpackMultiDouble() must be given a non-empty array");
+                    "RegionPacker.unpackMultiDouble() must be given a non-empty array");
         if (levels == null || levels.length != packed.length)
             throw new UnsupportedOperationException("The lengths of packed and levels must be equal");
         if (levels.length > 63)
             throw new UnsupportedOperationException(
-                    "Too many levels to be packed by CoordPacker; should be less than 64 but was given " +
+                    "Too many levels to be packed by RegionPacker; should be less than 64 but was given " +
                             levels.length);
         if(limit > levels.length)
             limit = levels.length;
@@ -1226,7 +1219,7 @@ public class CoordPacker {
      * Decompresses a short[][] returned by packMulti() and produces a simple 2D array where the values are bytes
      * corresponding to 1 + the highest index into levels (that is, the original levels parameter passed to packMulti)
      * matched by a cell, or 0 if the cell didn't match any levels during compression, as described in the
-     * {@link CoordPacker} class documentation. Width and height do not technically need to match the dimensions of
+     * {@link RegionPacker} class documentation. Width and height do not technically need to match the dimensions of
      * the original 2D array, but under most circumstances where they don't match, the data produced will be junk.
      * @param packed a short[][] encoded by calling this class' packMulti() method on a 2D array.
      * @param width the width of the 2D array that will be returned; should match the unpacked array's width.
@@ -1238,7 +1231,7 @@ public class CoordPacker {
     {
         if(packed == null || packed.length == 0)
             throw new ArrayIndexOutOfBoundsException(
-                    "CoordPacker.unpackMultiByte() must be given a non-empty array");
+                    "RegionPacker.unpackMultiByte() must be given a non-empty array");
         byte[][] unpacked = new byte[width][height];
         byte lPlus = 1;
         short x=0, y=0;
@@ -2538,7 +2531,7 @@ public class CoordPacker {
      * that is, every "on" cell becomes "off" and every "off" cell becomes "on", including cells that were "off" because
      * they were beyond the boundaries of the original 2D array passed to pack() or a similar method. This method does
      * not do any unpacking (which can be somewhat computationally expensive), and actually requires among the lowest
-     * amounts of computation to get a result of any methods in CoordPacker. However, because it will cause cells to be
+     * amounts of computation to get a result of any methods in RegionPacker. However, because it will cause cells to be
      * considered "on" that would cause an exception if directly converted to x,y positions and accessed in the source
      * 2D array, this method should primarily be used in conjunction with operations such as intersectPacked(), or have
      * the checking for boundaries handled internally by unpack() or related methods such as unpackMultiDouble().
@@ -3092,9 +3085,9 @@ public class CoordPacker {
 
     /**
      * Encodes a short array of packed data as a (larger, more memory-hungry) ASCII string, which can be decoded using
-     * CoordPacker.decodeASCII() . Uses 64 printable chars, from ';' (ASCII 59) to 'z' (ASCII 122).
+     * RegionPacker.decodeASCII() . Uses 64 printable chars, from ';' (ASCII 59) to 'z' (ASCII 122).
      * @param packed a packed data item produced by pack() or some other method from this class.
-     * @return a printable String, which can be decoded with CoordPacker.decodeASCII()
+     * @return a printable String, which can be decoded with RegionPacker.decodeASCII()
      */
     public static String encodeASCII(short[] packed)
     {
@@ -3108,8 +3101,8 @@ public class CoordPacker {
         return new String(chars);
     }
     /**
-     * Given a String specifically produced by CoordPacker.encodeASCII(), this will produce a packed data array.
-     * @param text a String produced by CoordPacker.encodeASCII(); this will almost certainly fail on other strings.
+     * Given a String specifically produced by RegionPacker.encodeASCII(), this will produce a packed data array.
+     * @param text a String produced by RegionPacker.encodeASCII(); this will almost certainly fail on other strings.
      * @return the packed data as a short array that was originally used to encode text
      */
     public static short[] decodeASCII(String text)
@@ -3213,18 +3206,18 @@ public class CoordPacker {
         return hilbertDistances[x + (y << 8)] & 0xffff;
     }
     /**
-     * Takes an x, y, z position and returns the length to travel along the 32x32x32 Hilbert curve to reach that
-     * position. This assumes x, y, and z are between 0 and 31, inclusive.
-     * This uses a lookup table for the 32x32x32 Hilbert Curve, which should make it faster than calculating the
+     * Takes an x, y, z position and returns the length to travel along the 16x16x16 Hilbert curve to reach that
+     * position. This assumes x, y, and z are between 0 and 15, inclusive.
+     * This uses a lookup table for the 16x16x16 Hilbert Curve, which should make it faster than calculating the
      * distance along the Hilbert Curve repeatedly.
      * Source: http://and-what-happened.blogspot.com/2011/08/fast-2d-and-3d-hilbert-curves-and.html
-     * @param x between 0 and 31 inclusive
-     * @param y between 0 and 31 inclusive
-     * @param z between 0 and 31 inclusive
+     * @param x between 0 and 15 inclusive
+     * @param y between 0 and 15 inclusive
+     * @param z between 0 and 15 inclusive
      * @return the distance to travel along the 32x32x32 Hilbert Curve to get to the given x, y, z point.
      */
     public static int posToHilbert3D( final int x, final int y, final int z ) {
-        return hilbert3Distances[x + (y << 5) + (z << 10)];
+        return hilbert3Distances[x + (y << 4) + (z << 8)];
     }
     /**
      * Takes an x, y position and returns the length to travel along the 16x16 Moore curve to reach that position.
@@ -3469,7 +3462,7 @@ public class CoordPacker {
     private static void computeHilbert3D(int x, int y, int z)
     {
         int hilbert = mortonEncode3D(x, y, z);
-        int block = 6;
+        int block = 9;
         int hcode = ( ( hilbert >> block ) & 7 );
         int mcode, shift, signs;
         shift = signs = 0;
@@ -3494,7 +3487,7 @@ public class CoordPacker {
         hilbert3X[hilbert] = (short)x;
         hilbert3Y[hilbert] = (short)y;
         hilbert3Z[hilbert] = (short)z;
-        hilbert3Distances[x + (y << 3) + (z << 6)] = (short)hilbert;
+        hilbert3Distances[x + (y << 4) + (z << 8)] = (short)hilbert;
     }
     private static int nextGray(int gray)
     {
@@ -3616,39 +3609,34 @@ public class CoordPacker {
 
 
     private static void computePukaHilbert3D() {
-        System.arraycopy(pukaX, 0, ph3X, 0, 125);
-        System.arraycopy(pukaY, 0, ph3Y, 0, 125);
-        System.arraycopy(pukaZ, 0, ph3Z, 0, 125);
-        System.arraycopy(pukaDistances, 0, ph3Distances, 0, 125);
-
         for (int h = 0, p = 0; h < 0x1000; h += 8, p += 125) {
             int startX = hilbert3X[h], startY = hilbert3Y[h], startZ = hilbert3Z[h],
                     endX = hilbert3X[h+7], endY = hilbert3Y[h+7], endZ = hilbert3Z[h+7],
                     bottomX = startX >> 1, bottomY = startY >> 1, bottomZ = startZ >> 1;
             int direction, rotation;
-            if(startX > endX) {
+            if(startX < endX) {
                 direction = 0;
-                rotation = ((startZ & 1) << 2) | (startY & 1);
+                rotation = ((startZ & 1) << 1) | (startY & 1);
             }
-            else if(startX < endX) {
+            else if(startX > endX) {
                 direction = 3;
-                rotation = ((startZ & 1) << 2) | (startY & 1);
-            }
-            else if(startY > endY) {
-                direction = 1;
-                rotation = ((startZ & 1) << 2) | (startX & 1);
+                rotation = ((startZ & 1) << 1) | (startY & 1);
             }
             else if(startY < endY) {
-                direction = 4;
-                rotation = ((startZ & 1) << 2) | (startX & 1);
+                direction = 1;
+                rotation = ((startZ & 1) << 1) | (startX & 1);
             }
-            else if(startZ > endZ) {
+            else if(startY > endY) {
+                direction = 4;
+                rotation = ((startZ & 1) << 1) | (startX & 1);
+            }
+            else if(startZ < endZ) {
                 direction = 2;
-                rotation = ((startY & 1) << 2) | (startX & 1);
+                rotation = ((startY & 1) << 1) | (startX & 1);
             }
             else {
                 direction = 5;
-                rotation = ((startY & 1) << 2) | (startX & 1);
+                rotation = ((startY & 1) << 1) | (startX & 1);
             }
             rotation = rotation ^ (rotation >> 1);
             byte x, y, z;
