@@ -165,8 +165,6 @@ public class RegionPacker {
     public static final byte[][][] pukaRotations;
 
     static {
-        ClassLoader cl = RegionPacker.class.getClassLoader();
-
         Coord c;
         for (int i = 0; i < 0x10000; i++) {
             c = RegionPacker.hilbertToCoordNoLUT(i);
@@ -266,7 +264,6 @@ public class RegionPacker {
                         pukaY, pukaXreverse, pukaZreverse
                 }
         };
-
 
         computePukaHilbert3D();
 
@@ -3389,7 +3386,8 @@ public class RegionPacker {
         return morton;
     }
     */
-    /*
+
+    /**
      * Takes a distance to travel along the 256x256 Hilbert curve and returns a Coord representing the position
      * in 2D space that corresponds to that point on the Hilbert curve. This variant does not use a lookup table,
      * and is likely slower.
@@ -3397,7 +3395,6 @@ public class RegionPacker {
      * @param hilbert
      * @return
      */
-
     private static Coord hilbertToCoordNoLUT( final int hilbert )
     {
         int x = 0, y = 0;

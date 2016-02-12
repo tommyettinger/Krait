@@ -4,7 +4,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * Basic radius strategy implementations likely to be used for roguelikes.
+ * Basic radius strategy implementations for 2D and 3D grids.
  *
  * @author Eben Howard - http://squidpony.com - howard@squidpony.com
  */

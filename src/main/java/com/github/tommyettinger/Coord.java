@@ -300,7 +300,7 @@ public class Coord implements java.io.Serializable {
 			if (x + d.deltaX == adjacent.x && y + d.deltaY == adjacent.y)
 				return d;
 		}
-		throw new IllegalStateException(String.format("%s is not adjacent to %s", this, adjacent));
+		throw new IllegalStateException(this + " is not adjacent to " + adjacent);
 	}
 
     /**
