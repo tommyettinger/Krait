@@ -1,6 +1,9 @@
 package com.github.tommyettinger;
 
 /**
+ * A CurveStrategy for 2D Hilbert curves occupying a square with power-of-two side length. Side length must be between
+ * 2 and 2^31 (in hex, 0x80000000), and will be clamped to that range. If a non-power-of-two length is requested, the
+ * first greater power of two is used for a side length.
  * Created by Tommy Ettinger on 2/11/2016.
  */
 public class Hilbert2DStrategy extends CurveStrategy {
@@ -8,18 +11,34 @@ public class Hilbert2DStrategy extends CurveStrategy {
     private byte[] bX, bY, bDist;
     private short[] sX, sY, sDist;
     private int[] iX, iY, iDist;
+    /**
+     * Equivalent to the order of this Hilbert Curve
+     */
     private int bits;
+    /**
+     * Side length of the square.
+     */
     private long side;
     private static final int DIMENSION = 2;
+
+    /**
+     * Constructs a Hilbert2DStrategy with side length 256, which will pre-calculate the 2^16 points of that Hilbert
+     * Curve and store their x coordinates, y coordinates, and distances in short arrays.
+     */
     public Hilbert2DStrategy()
     {
         this(256);
     }
     public Hilbert2DStrategy(long sideLength) {
-        if(sideLength <= 1)
+        if(sideLength <= 0x8000000000000000L || sideLength > 0x80000000L)
         {
-            throw new UnsupportedOperationException("sideLength must be at least 2");
+            sideLength = 0x80000000L;
         }
+        else if(sideLength <= 1)
+        {
+            sideLength = 2;
+        }
+
         side = HilbertUtility.nextPowerOfTwo(sideLength);
         dimensionality = new long[]{side, side};
         maxDistance = side * side;
@@ -90,19 +109,11 @@ public class Hilbert2DStrategy extends CurveStrategy {
                 case 2:
                 case 3:
                 case 4:
+                    return new long[]{bX[(int)distance], bY[(int)distance]};
                 case 5:
                 case 6:
                 case 7:
                 case 8:
-                    return new long[]{bX[(int)distance], bY[(int)distance]};
-                case 9:
-                case 10:
-                case 11:
-                case 12:
-                case 13:
-                case 14:
-                case 15:
-                case 16:
                     return new long[]{sX[(int)distance], sY[(int)distance]};
                 default:
                     return new long[]{iX[(int)distance], iY[(int)distance]};
@@ -132,22 +143,14 @@ public class Hilbert2DStrategy extends CurveStrategy {
                 case 2:
                 case 3:
                 case 4:
-                case 5:
-                case 6:
-                case 7:
-                case 8:
                     if(dimension == 0)
                         return bX[(int)distance];
                     else
                         return bY[(int)distance];
-                case 9:
-                case 10:
-                case 11:
-                case 12:
-                case 13:
-                case 14:
-                case 15:
-                case 16:
+                case 5:
+                case 6:
+                case 7:
+                case 8:
                     if(dimension == 0)
                         return sX[(int)distance];
                     else
@@ -175,6 +178,24 @@ public class Hilbert2DStrategy extends CurveStrategy {
     public long distance(long... coordinates) {
         if(coordinates.length != 2)
             return -1;
+        if(stored)
+        {
+            switch (bits)
+            {
+                case 1:
+                case 2:
+                case 3:
+                case 4:
+                    return bDist[(int)coordinates[0] + ((int)coordinates[1] << bits)];
+                case 5:
+                case 6:
+                case 7:
+                case 8:
+                    return sDist[(int)coordinates[0] + ((int)coordinates[1] << bits)];
+                default:
+                    return iDist[(int)coordinates[0] + ((int)coordinates[1] << bits)];
+            }
+        }
         return pointToDistanceClosedForm(coordinates[0], coordinates[1]);
 
     }
@@ -191,7 +212,7 @@ public class Hilbert2DStrategy extends CurveStrategy {
     {
         long x = 0, y = 0;
         int remap = 0xb4;
-        int block = bits;
+        int block = bits << 1;
         while( block > 0 )
         {
             block -= 2;
@@ -210,6 +231,7 @@ public class Hilbert2DStrategy extends CurveStrategy {
      * <br>
      * Source: A Closed-Form Algorithm for Converting Hilbert Space-Filling Curve Indices
      * by Chih-Sheng Chen, Shen-Yi Lin, Min-Hsuan Fan, and Chua-Huang Huang
+     * Retrieved from http://www.iaeng.org/IJCS/issues_v37/issue_1/IJCS_37_1_02.pdf
      * @param x x coordinate
      * @param y y coordinate
      * @return corresponding distance
@@ -227,14 +249,12 @@ public class Hilbert2DStrategy extends CurveStrategy {
             if (xi==0 && yi==0) { // Case 1
                 tmp = x; x = y; y = tmp;
             }
-            else if (xi==0 && yi==1) { // Case 2
-            }
             else if (xi==1 && yi==0) { // Case 3
                 xi = 1; yi = 1;
                 tmp = x; x = y; y = tmp;
                 x = ~x & mask; y = ~y & mask;
             }
-            else { // Case 4
+            else if(!(xi==0 && yi==1)){ // Case 4
                 xi = 1; yi = 0;
             }
             pos >>>= 1; mask >>>= 1;
