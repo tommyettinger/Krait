@@ -213,7 +213,7 @@ public class RegionPacker {
                         pukaXreverse, pukaZ, pukaYreverse
                 },
                 new byte[][]{ // 7
-                        pukaY, pukaZ, pukaYreverse
+                        pukaY, pukaZ, pukaXreverse
                 },
                 new byte[][]{ // 8
                         pukaX, pukaY, pukaZ
@@ -3641,7 +3641,7 @@ public class RegionPacker {
                 ph3X[p + i] = x = (byte)(pukaRotations[direction * 4 + rotation][0][i] + bottomX * 5);
                 ph3Y[p + i] = y = (byte)(pukaRotations[direction * 4 + rotation][1][i] + bottomY * 5);
                 ph3Z[p + i] = z = (byte)(pukaRotations[direction * 4 + rotation][2][i] + bottomZ * 5);
-                ph3Distances[x * 1600 + y * 40 + z] = (short)(p + i);
+                ph3Distances[x + y * 40 + z * 1600] = (short)(p + i);
             }
         }
     }

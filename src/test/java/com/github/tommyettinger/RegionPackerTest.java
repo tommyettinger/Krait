@@ -87,7 +87,7 @@ public class RegionPackerTest {
     public void testPHCurve3D() {
         assertEquals (ph3Distances[0], 0);
         for (int i = 1; i < 64000; i++) {
-            assertEquals ((ph3Distances[ph3X[i] * 1600 + ph3Y[i] * 40 + ph3Z[i]] & 0xffff), i);
+            assertEquals ((ph3Distances[ph3X[i] + ph3Y[i] * 40 + ph3Z[i] * 1600] & 0xffff), i);
             assertEquals(Math.abs(ph3X[i] - ph3X[i - 1] + ph3Y[i] - ph3Y[i - 1] + ph3Z[i] - ph3Z[i - 1]), 1);
         }
 
