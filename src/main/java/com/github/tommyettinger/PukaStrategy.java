@@ -1,7 +1,7 @@
 package com.github.tommyettinger;
 
 /**
- * A CurveStrategy for a specific 3D space-filling curve that fits in 1 5x5x5 cube. This Puka Curve can be used to
+ * A CurveStrategy for a specific 3D space-filling curve that fits in a 5x5x5 cube. This Puka Curve can be used to
  * replace all 2x2x2 sections of a Hilbert Curve and thus cover a greater amount of 3D space than the largest possible
  * 3D Hilbert Curve for some bit sizes, and with the same bit count per coordinate and distance. There are some quirks
  * when mixing odd-side-length cubes with Hilbert Curve sections, limiting the amount of fractal self-similarity for
@@ -38,18 +38,18 @@ public class PukaStrategy extends CurveStrategy {
     public final byte[] pukaDist;
 
     /**
-     * Side length of the square.
+     * Side length of the cube.
      */
     private static final long side = 5;
     private static final int DIMENSION = 3;
 
     /**
-     * Constructs a PukaStrategy with side length 256, which will pre-calculate the 2^16 points of that Hilbert
-     * Curve and store their x coordinates, y coordinates, and distances in short arrays.
+     * Constructs a PukaStrategy with side length 5, which will pre-calculate the 125 points of that Puka
+     * Curve and store their x coordinates, y coordinates, z coordinates, and distances in short arrays.
      */
     public PukaStrategy() {
 
-        dimensionality = new long[]{side, side};
+        dimensionality = new long[]{side, side, side};
         maxDistance = 125;
 
         pukaX = new byte[]
