@@ -23,13 +23,13 @@ public class HilbertGeneralStrategy extends CurveStrategy {
     private int[][] iVals;
 
     /**
-     * Equivalent to the order of this Hilbert Curve
+     * Equivalent to the order of this Hilbert Curve.
      */
-    private int bits;
+    public int bits;
     /**
      * Side length of the square.
      */
-    private long side;
+    public long side;
     public final int DIMENSION;
 
     /**
@@ -60,9 +60,9 @@ public class HilbertGeneralStrategy extends CurveStrategy {
 
         side = HilbertUtility.nextPowerOfTwo(sideLength);
         bits = Long.numberOfTrailingZeros(side);
-        if(side <= 0x8000000000000000L || bits * DIMENSION > 62)
+        if(side <= 0x8000000000000000L || bits * DIMENSION > 63)
         {
-            bits = 62 / DIMENSION;
+            bits = 63 / DIMENSION;
             side = 1 << bits;
         }
 
@@ -159,20 +159,28 @@ public class HilbertGeneralStrategy extends CurveStrategy {
      */
     @Override
     public long[] point(long distance) {
-        distance %= maxDistance;
+        distance = (distance + maxDistance) % maxDistance;
         if(stored)
         {
-            switch (bits)
+            switch (bits * DIMENSION)
             {
                 case 1:
                 case 2:
                 case 3:
                 case 4:
-                    return toPoint(bVals[(int)distance]);
                 case 5:
                 case 6:
                 case 7:
                 case 8:
+                    return toPoint(bVals[(int)distance]);
+                case 9:
+                case 10:
+                case 11:
+                case 12:
+                case 13:
+                case 14:
+                case 15:
+                case 16:
                     return toPoint(sVals[(int)distance]);
                 default:
                     return toPoint(iVals[(int)distance]);
@@ -193,20 +201,28 @@ public class HilbertGeneralStrategy extends CurveStrategy {
     @Override
     public long coordinate(long distance, int dimension) {
         dimension %= DIMENSION;
-        distance %= maxDistance;
+        distance = (distance + maxDistance) % maxDistance;
         if(stored)
         {
-            switch (bits)
+            switch (bits * DIMENSION)
             {
                 case 1:
                 case 2:
                 case 3:
                 case 4:
-                    return bVals[(int)distance][dimension];
                 case 5:
                 case 6:
                 case 7:
                 case 8:
+                    return bVals[(int)distance][dimension];
+                case 9:
+                case 10:
+                case 11:
+                case 12:
+                case 13:
+                case 14:
+                case 15:
+                case 16:
                     return sVals[(int)distance][dimension];
                 default:
                     return iVals[(int)distance][dimension];
@@ -230,17 +246,25 @@ public class HilbertGeneralStrategy extends CurveStrategy {
             return -1;
         if(stored)
         {
-            switch (bits)
+            switch (bits * DIMENSION)
             {
                 case 1:
                 case 2:
                 case 3:
                 case 4:
-                    return bDist[lookup(coordinates)];
                 case 5:
                 case 6:
                 case 7:
                 case 8:
+                    return bDist[lookup(coordinates)];
+                case 9:
+                case 10:
+                case 11:
+                case 12:
+                case 13:
+                case 14:
+                case 15:
+                case 16:
                     return sDist[lookup(coordinates)];
                 default:
                     return iDist[lookup(coordinates)];

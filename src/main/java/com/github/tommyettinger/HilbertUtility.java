@@ -40,7 +40,7 @@ public class HilbertUtility {
     {
         i %= width;
         v = (v >>> i) | (v << width - i);
-        return v & (1 << width);
+        return v & ((1 << width) - 1);
 
     }
 
@@ -55,7 +55,7 @@ public class HilbertUtility {
     {
         i %= width;
         v = (v << i) | (v >>> width - i);
-        return v & (1 << width);
+        return v & ((1 << width)-1);
     }
 
     /**
@@ -146,16 +146,18 @@ public class HilbertUtility {
      * @return a long array of coordinates representing a point
      */
     public static long[] distanceToPoint(int order, int dimension, long distance) {
-        long hwidth = order * dimension, e = 0, d = 0, w, l, b;
+        long hwidth = order * dimension, e = 0, d = 0, w, l, b, w2;
         long[] p = new long[dimension];
         for (int i = 0; i < order; i++) {
+            //        w = utils.bitrange(h, hwidth, i*dimension, i*dimension+dimension)
+            //x >> (width-end) & ((2**(end-start))-1)
             w = distance >>> (hwidth - (i * dimension + dimension))
-                    & ((2 << ((i * dimension + dimension) - i * dimension)) -1);
+                    & ((1 << ((i * dimension + dimension) - i * dimension)) -1);
             l = grayCode(w);
-            l = inverseTransform(e, d, 2, l);
+            l = inverseTransform(e, d, dimension, l);
             for (int j = 0; j < dimension; j++) {
                 b = l >>> (dimension - (j + 1)) & 1;
-                p[j] ^= (-b ^ p[j]) & (1 << (order - 1 - i));
+                p[j] ^= (-b ^ p[j]) & (1 << (order - 1 - i)); //(order - 1 - i)
             }
             e ^= rotateLeft(entry(w), d+1, dimension);
             d = (d + direction(w, dimension) + 1)% dimension;

@@ -43,7 +43,7 @@ public class Hilbert2DStrategy extends CurveStrategy {
         dimensionality = new long[]{side, side};
         maxDistance = side * side;
         bits = Long.numberOfTrailingZeros(side);
-        int xCoord = bits % 2 == 0 ? 0 : 1, yCoord = bits % 2 == 1 ? 0 : 1;
+        //int xCoord = bits % 2 == 0 ? 0 : 1, yCoord = bits % 2 == 1 ? 0 : 1;
         if (maxDistance <= 0x100) {
             bX = new byte[(int)maxDistance];
             bY = new byte[(int)maxDistance];
@@ -51,9 +51,9 @@ public class Hilbert2DStrategy extends CurveStrategy {
             long[] c;
             for (int i = 0; i < maxDistance; i++) {
                 c = distanceToPointSmall(i);
-                bX[i] = (byte) c[xCoord];
-                bY[i] = (byte) c[yCoord];
-                bDist[(int)c[xCoord] + (((int)c[yCoord]) << bits)] = (byte) i;
+                bX[i] = (byte) c[0];
+                bY[i] = (byte) c[1];
+                bDist[(int)c[0] + (((int)c[1]) << bits)] = (byte) i;
             }
             stored = true;
         }
@@ -64,9 +64,9 @@ public class Hilbert2DStrategy extends CurveStrategy {
             long[] c;
             for (int i = 0; i < maxDistance; i++) {
                 c = distanceToPointSmall(i);
-                sX[i] = (short) c[xCoord];
-                sY[i] = (short) c[yCoord];
-                sDist[(int)c[xCoord] + (((int)c[yCoord]) << bits)] = (short) i;
+                sX[i] = (short) c[0];
+                sY[i] = (short) c[1];
+                sDist[(int)c[0] + (((int)c[1]) << bits)] = (short) i;
             }
             stored = true;
         }
@@ -77,9 +77,9 @@ public class Hilbert2DStrategy extends CurveStrategy {
             long[] c;
             for (int i = 0; i < maxDistance; i++) {
                 c = HilbertUtility.distanceToPoint(bits, DIMENSION, i);
-                iX[i] = (int) c[xCoord];
-                iY[i] = (int) c[yCoord];
-                iDist[(int)c[xCoord] + (((int)c[yCoord]) << bits)] = i;
+                iX[i] = (int) c[0];
+                iY[i] = (int) c[1];
+                iDist[(int)c[0] + (((int)c[1]) << bits)] = i;
             }
             stored = true;
         }
@@ -100,7 +100,7 @@ public class Hilbert2DStrategy extends CurveStrategy {
      */
     @Override
     public long[] point(long distance) {
-        distance %= maxDistance;
+        distance = (distance + maxDistance) % maxDistance;
         if(stored)
         {
             switch (bits)
@@ -134,7 +134,7 @@ public class Hilbert2DStrategy extends CurveStrategy {
     @Override
     public long coordinate(long distance, int dimension) {
         dimension %= 2;
-        distance %= maxDistance;
+        distance = (distance + maxDistance) % maxDistance;
         if(stored)
         {
             switch (bits)

@@ -96,7 +96,7 @@ public class PukaStrategy extends CurveStrategy {
      */
     @Override
     public long[] point(long distance) {
-        distance %= maxDistance;
+        distance = (distance + maxDistance) % maxDistance;
         return new long[]{pukaX[(int)distance], pukaY[(int)distance], pukaZ[(int)distance]};
     }
 
@@ -112,7 +112,7 @@ public class PukaStrategy extends CurveStrategy {
     @Override
     public long coordinate(long distance, int dimension) {
         dimension %= 3;
-        distance %= maxDistance;
+        distance = (distance + maxDistance) % maxDistance;
 
         switch (dimension) {
             case 0:
@@ -148,7 +148,7 @@ public class PukaStrategy extends CurveStrategy {
      * @return a long array, containing the x, y, z, etc. coordinates as elements to match the length of dimensionality
      */
     public long[] pointRotated(int distance, int direction, int rotation) {
-        distance %= maxDistance;
+        distance = (int)((distance + maxDistance) % maxDistance);
         switch (4 * direction + rotation)
         {
             case 0:
@@ -214,7 +214,7 @@ public class PukaStrategy extends CurveStrategy {
      * @return the appropriate dimension's rotated coordinate for the point corresponding to distance traveled
      */
     public long coordinateRotated(int distance, int dimension, int direction, int rotation) {
-        distance %= maxDistance;
+        distance = (int)((distance + maxDistance) % maxDistance);
         switch (dimension) {
             case 0:
                 switch (4 * direction + rotation) {

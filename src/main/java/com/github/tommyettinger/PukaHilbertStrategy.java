@@ -100,7 +100,7 @@ public class PukaHilbertStrategy extends CurveStrategy {
      */
     @Override
     public long[] point(long distance) {
-        distance %= maxDistance;
+        distance = (distance + maxDistance) % maxDistance;
         return new long[]{pukaHilbertX[(int)distance], pukaHilbertY[(int)distance], pukaHilbertZ[(int)distance]};
     }
 
@@ -116,7 +116,7 @@ public class PukaHilbertStrategy extends CurveStrategy {
     @Override
     public long coordinate(long distance, int dimension) {
         dimension %= 3;
-        distance %= maxDistance;
+        distance = (distance + maxDistance) % maxDistance;
 
         switch (dimension) {
             case 0:
