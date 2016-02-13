@@ -1,6 +1,7 @@
 package com.github.tommyettinger;
 
 /**
+ * Utilities for dealing with n-dimensional Hilbert Curves.
  * Created by Tommy Ettinger on 2/12/2016.
  */
 public class HilbertUtility {

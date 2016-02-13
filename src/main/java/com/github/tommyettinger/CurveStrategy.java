@@ -13,7 +13,7 @@ public abstract class CurveStrategy {
     public long maxDistance;
     /**
      * An array of dimension lengths, which are often (but not always) all equal. For a 5x5x5 space-filling curve, this
-     * would have a value of 5L, 5L, 5L. For a 24x24x16 space-filing curve, this would have a value of 24L, 24L, 16L.
+     * would have a value of 5L, 5L, 5L. For a 32x32x16 space-filing curve, this would have a value of 32L, 32L, 16L.
      */
     public long[] dimensionality;
     /**
@@ -34,7 +34,7 @@ public abstract class CurveStrategy {
      * @param distance the distance to travel along the space-filling curve
      * @return a long array, containing the x, y, z, etc. coordinates as elements to match the length of dimensionality
      */
-    public abstract long[] getPoint(long distance);
+    public abstract long[] point(long distance);
 
     /**
      * Given a distance to travel along this space-filling curve and a dimension index (in 2D, x is 0 and y is 1; in

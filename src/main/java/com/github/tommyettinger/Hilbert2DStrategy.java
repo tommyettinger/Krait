@@ -79,7 +79,7 @@ public class Hilbert2DStrategy extends CurveStrategy {
                 c = HilbertUtility.distanceToPoint(bits, DIMENSION, i);
                 iX[i] = (int) c[xCoord];
                 iY[i] = (int) c[yCoord];
-                iDist[(int)c[xCoord] + (((int)c[yCoord]) << bits)] = (short) i;
+                iDist[(int)c[xCoord] + (((int)c[yCoord]) << bits)] = i;
             }
             stored = true;
         }
@@ -99,7 +99,7 @@ public class Hilbert2DStrategy extends CurveStrategy {
      * @return a long array, containing the x, y, z, etc. coordinates as elements to match the length of dimensionality
      */
     @Override
-    public long[] getPoint(long distance) {
+    public long[] point(long distance) {
         distance %= maxDistance;
         if(stored)
         {
