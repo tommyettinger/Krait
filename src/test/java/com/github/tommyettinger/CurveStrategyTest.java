@@ -145,9 +145,9 @@ public class CurveStrategyTest {
     public void testMoore3D()
     {
         System.out.println("Moore Curve 3D");
-        MooreGeneralStrategy moore = new MooreGeneralStrategy(3, 3, 0, 2);
+        MooreGeneralStrategy moore = new MooreGeneralStrategy(3, 3, 1, 3);
         System.out.println("Max distance: 0x" + Long.toHexString(moore.maxDistance));
-        long[] pt = moore.point(0);
+        long[] pt = moore.point(0), pt2;
         printlnPoint("Moore position 0", pt);
         pt = moore.point(1);
         printlnPoint("Moore position 1", pt);
@@ -155,15 +155,14 @@ public class CurveStrategyTest {
         printlnPoint("Moore position 4", pt);
         pt = moore.point(-1);
         printlnPoint("Moore position end", pt);
-
-        for (int i = 0; i < moore.maxDistance; i++) {
-            printPoint(moore.point(i));
-            System.out.print(", ");
-            if(i % 8 == 7)
-                System.out.println();
+        pt = moore.point(0);
+        for (int i = 1; i < moore.maxDistance; i++) {
+            pt2 = moore.point(i);
+            assertEquals(1, Math.abs(pt[0] - pt2[0]) + Math.abs(pt[1] - pt2[1]) + Math.abs(pt[2] - pt2[2]));
+            pt = pt2;
         }
         System.out.println();
-        moore = new MooreGeneralStrategy(3, 30, 0, 2);
+        moore = new MooreGeneralStrategy(3, 30, 1, 3);
         System.out.println("Max distance: 0x" + Long.toHexString(moore.maxDistance));
         pt = moore.point(0);
         printlnPoint("Moore Order 6 position 0", pt);

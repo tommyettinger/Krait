@@ -82,15 +82,15 @@ public class MooreGeneralStrategy extends CurveStrategy {
      */
     @Override
     public long[] point(long distance) {
-        distance %= maxDistance;
+        distance = (distance + maxDistance) % maxDistance;
         long h = distance & innerMask;
         long sector = distance >>> innerBits, arrange = HilbertUtility.grayCode(sector * 2 / stretch);
         long[] minor = hilbert.point(h), pt = new long[DIMENSION];
         for (int d = 0, a = (stretchAxis + 1) % DIMENSION; d < DIMENSION; d++, a = (a + 1) % DIMENSION) {
-            if (d == DIMENSION - 1) {
+            if (a == stretchAxis) {
                 pt[a] = (sector / stretch) % 2 == 0
                         ? side * (sector % stretch) + minor[d]
-                        : side * (stretch - (sector % stretch)) - minor[d];
+                        : side * (stretch - (sector % stretch)) - 1 - minor[d];
             } else {
                 pt[a] = ((arrange >> (DIMENSION - 1 - d)) & 1) == 0 ? side - 1 - minor[d] : side + minor[d];
             }
@@ -109,8 +109,8 @@ public class MooreGeneralStrategy extends CurveStrategy {
      */
     @Override
     public long coordinate(long distance, int dimension) {
-        dimension %= DIMENSION;
-        distance %= maxDistance;
+        dimension = (dimension + DIMENSION) % DIMENSION;
+        distance = (distance + maxDistance) % maxDistance;
         long h = distance & innerMask;
         long sector = distance >>> innerBits, arrange = HilbertUtility.grayCode(sector * 2 / stretch);
         int d = (stretchAxis + 1 + dimension) % DIMENSION;
