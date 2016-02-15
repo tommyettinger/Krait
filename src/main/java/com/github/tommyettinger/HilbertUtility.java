@@ -30,6 +30,24 @@ public class HilbertUtility {
     }
 
     /**
+     * Reverses a gray code.
+     * Source: https://github.com/cortesi/scurve
+     * @param v the gray code to invert
+     * @return the inverse gray code of v
+     */
+    public static long inverseGrayCode(long v)
+    {
+        if(v == 0)
+            return v;
+        long m = Long.numberOfTrailingZeros(nextPowerOfTwo(v)) + 1;
+        long i = v;
+        for (int j = 1; j < m; j++) {
+            i ^= (v >>> j);
+        }
+        return i;
+    }
+
+    /**
      * Source: https://github.com/cortesi/scurve
      * @param v value to rotate right
      * @param i amount to rotate by

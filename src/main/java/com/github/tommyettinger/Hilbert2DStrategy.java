@@ -70,7 +70,7 @@ public class Hilbert2DStrategy extends CurveStrategy {
             }
             stored = true;
         }
-        else if (maxDistance <= 0x1000000) {
+        else if (maxDistance <= 0x100000) {
             iX = new int[(int)maxDistance];
             iY = new int[(int)maxDistance];
             iDist = new int[(int)maxDistance];

@@ -95,7 +95,7 @@ public class HilbertGeneralStrategy extends CurveStrategy {
             }
             stored = true;
         }
-        else if (maxDistance <= 0x1000000) {
+        else if (maxDistance <= 0x100000) {
             iVals = new int[(int)maxDistance][DIMENSION];
             iDist = new int[(int)maxDistance];
             long[] c;

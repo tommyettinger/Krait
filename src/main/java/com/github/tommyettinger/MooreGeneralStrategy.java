@@ -18,7 +18,8 @@ public class MooreGeneralStrategy extends CurveStrategy {
 
     private HilbertGeneralStrategy hilbert;
     private long side;
-    private int stretch;
+    private int stretch, stretchAxis;
+    private long innerMask, innerBits;
     public final int DIMENSION;
 
     /**
@@ -63,7 +64,11 @@ public class MooreGeneralStrategy extends CurveStrategy {
         dimensionality = new long[DIMENSION];
         Arrays.fill(dimensionality, side * 2);
         dimensionality[stretchAxis] = side * stretch;
+        this.stretchAxis = stretchAxis;
+        this.stretch = stretch;
         hilbert = new HilbertGeneralStrategy(DIMENSION, side);
+        innerBits = hilbert.bits * DIMENSION;
+        innerMask = hilbert.maxDistance - 1;
     }
 
     /**
@@ -78,7 +83,19 @@ public class MooreGeneralStrategy extends CurveStrategy {
     @Override
     public long[] point(long distance) {
         distance %= maxDistance;
-        return hilbert.point(distance);
+        long h = distance & innerMask;
+        long sector = distance >>> innerBits, arrange = HilbertUtility.grayCode(sector * 2 / stretch);
+        long[] minor = hilbert.point(h), pt = new long[DIMENSION];
+        for (int d = 0, a = (stretchAxis + 1) % DIMENSION; d < DIMENSION; d++, a = (a + 1) % DIMENSION) {
+            if (d == DIMENSION - 1) {
+                pt[a] = (sector / stretch) % 2 == 0
+                        ? side * (sector % stretch) + minor[d]
+                        : side * (stretch - (sector % stretch)) - minor[d];
+            } else {
+                pt[a] = ((arrange >> (DIMENSION - 1 - d)) & 1) == 0 ? side - 1 - minor[d] : side + minor[d];
+            }
+        }
+        return pt;
     }
 
     /**
@@ -94,7 +111,20 @@ public class MooreGeneralStrategy extends CurveStrategy {
     public long coordinate(long distance, int dimension) {
         dimension %= DIMENSION;
         distance %= maxDistance;
-        return hilbert.coordinate(distance, dimension);
+        long h = distance & innerMask;
+        long sector = distance >>> innerBits, arrange = HilbertUtility.grayCode(sector * 2 / stretch);
+        int d = (stretchAxis + 1 + dimension) % DIMENSION;
+        long minor = hilbert.coordinate(h, d), co;
+        if (d == DIMENSION - 1) {
+            co = ((sector / stretch) & 1) == 0
+                    ? side * (sector % stretch) + minor
+                    : side * (stretch - (sector % stretch)) - minor;
+        } else {
+            co = ((arrange >> (DIMENSION - 1 - d)) & 1) == 0 ? side - 1 - minor : side + minor;
+        }
+
+        return co;
+
     }
 
     /**
@@ -109,7 +139,38 @@ public class MooreGeneralStrategy extends CurveStrategy {
     public long distance(long... coordinates) {
         if(coordinates.length != DIMENSION)
             return -1;
-        return hilbert.distance(coordinates);
+        long arrange = 0L, sector = 0L, bonus = 0L, dist = 0L;
+        long[] co = new long[coordinates.length];
+        System.arraycopy(coordinates, 0, co, 0, coordinates.length);
+        for (int d = 0, a = (stretchAxis + 1) % DIMENSION; d < DIMENSION; d++, a = (a + 1) % DIMENSION) {
+            if(a == stretchAxis)
+            {
+                sector = HilbertUtility.inverseGrayCode(arrange) >>> 1;
+                bonus = (sector * stretch);
+                if((sector & 1) == 0)
+                {
+                    co[a] %= side;
+                    bonus += coordinates[a] / side;
+                }
+                else
+                {
+                    co[a] = (side * stretch - 1 - co[a]) % side;
+                    bonus += (side * stretch - 1 - coordinates[a]) / side;
+                }
+                dist = hilbert.distance(co) + (bonus << innerBits);
+            }
+            else {
+                if (coordinates[a] >= side) {
+                    arrange |= 1 << (DIMENSION - 1 - d);
+                    co[a] -= side;
+                }
+                else
+                {
+                    co[a] = -(co[a] - (side - 1));
+                }
+            }
+        }
+        return dist;
 
     }
 
