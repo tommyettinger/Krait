@@ -1,16 +1,20 @@
 package com.github.tommyettinger;
 
+import java.nio.ByteBuffer;
+
 /**
- * A CurveStrategy for 2D Hilbert curves occupying a square with power-of-two side length. Side length must be between
- * 2 and 2^31 (in hex, 0x80000000), and will be clamped to that range. If a non-power-of-two length is requested, the
- * first greater power of two is used for a side length.
+ * A CurveStrategy for 2D Hilbert curves occupying a square with power-of-two side length, using NIO buffers internally
+ * when pre-calculating distances and positions is a viable option. Side length must be between 2 and 2^31 (in hex,
+ * 0x80000000), and will be clamped to that range. If a non-power-of-two length is requested, the first greater power of
+ * two is used for a side length.
+ * <br>
+ * Use of this class is not recommended if you create many different sizes of Hilbert Curve, since the NIO buffers are
+ * more expensive to get rid of.
  * Created by Tommy Ettinger on 2/11/2016.
  */
-public class Hilbert2DStrategy extends CurveStrategy {
+public class Hilbert2DStrategyNIO extends CurveStrategy {
 
-    private byte[] bX, bY, bDist;
-    private short[] sX, sY, sDist;
-    private int[] iX, iY, iDist;
+    private ByteBuffer bX, bY, bDist;
 
     /**
      * Equivalent to the order of this Hilbert Curve
@@ -26,11 +30,11 @@ public class Hilbert2DStrategy extends CurveStrategy {
      * Constructs a Hilbert2DStrategy with side length 256, which will pre-calculate the 2^16 points of that Hilbert
      * Curve and store their x coordinates, y coordinates, and distances in short arrays.
      */
-    public Hilbert2DStrategy()
+    public Hilbert2DStrategyNIO()
     {
         this(256);
     }
-    public Hilbert2DStrategy(long sideLength) {
+    public Hilbert2DStrategyNIO(long sideLength) {
         if(sideLength <= 0x8000000000000000L || sideLength > 0x80000000L)
         {
             sideLength = 0x80000000L;
@@ -47,41 +51,41 @@ public class Hilbert2DStrategy extends CurveStrategy {
         bits = Long.numberOfTrailingZeros(side);
         //int xCoord = bits % 2 == 0 ? 0 : 1, yCoord = bits % 2 == 1 ? 0 : 1;
         if (maxDistance <= 0x100) {
-            bX = new byte[(int)maxDistance];
-            bY = new byte[(int)maxDistance];
-            bDist = new byte[(int)maxDistance];
+            bX = ByteBuffer.allocateDirect((int)maxDistance);
+            bY = ByteBuffer.allocateDirect((int)maxDistance);
+            bDist = ByteBuffer.allocateDirect((int)maxDistance);
             long[] c;
             for (int i = 0; i < maxDistance; i++) {
                 c = distanceToPointSmall(i);
-                bX[i] = (byte) c[0];
-                bY[i] = (byte) c[1];
-                bDist[(int)c[0] + (((int)c[1]) << bits)] = (byte) i;
+                bX.put((byte) c[0]);
+                bY.put((byte) c[0]);
+                bDist.put((int)(c[0] | c[1] << bits), (byte) i);
             }
             stored = true;
         }
         else if (maxDistance <= 0x10000) {
-            sX = new short[(int)maxDistance];
-            sY = new short[(int)maxDistance];
-            sDist = new short[(int)maxDistance];
+            bX = ByteBuffer.allocateDirect((int)maxDistance * 2);
+            bY = ByteBuffer.allocateDirect((int)maxDistance * 2);
+            bDist = ByteBuffer.allocateDirect((int)maxDistance * 2);
             long[] c;
             for (int i = 0; i < maxDistance; i++) {
                 c = distanceToPointSmall(i);
-                sX[i] = (short) c[0];
-                sY[i] = (short) c[1];
-                sDist[(int)c[0] + (((int)c[1]) << bits)] = (short) i;
+                bX.putShort((short) c[0]);
+                bY.putShort((short) c[0]);
+                bDist.putShort((int)(c[0] | c[1] << bits) << 1, (short) i);
             }
             stored = true;
         }
         else if (maxDistance <= 0x100000) {
-            iX = new int[(int)maxDistance];
-            iY = new int[(int)maxDistance];
-            iDist = new int[(int)maxDistance];
+            bX = ByteBuffer.allocateDirect((int)maxDistance * 4);
+            bY = ByteBuffer.allocateDirect((int)maxDistance * 4);
+            bDist = ByteBuffer.allocateDirect((int)maxDistance * 4);
             long[] c;
             for (int i = 0; i < maxDistance; i++) {
                 c = HilbertUtility.distanceToPoint(bits, DIMENSION, i);
-                iX[i] = (int) c[0];
-                iY[i] = (int) c[1];
-                iDist[(int)c[0] + (((int)c[1]) << bits)] = i;
+                bX.putInt((int) c[0]);
+                bY.putInt((int) c[0]);
+                bDist.putInt((int)(c[0] | c[1] << bits) << 2, i);
             }
             stored = true;
         }
@@ -111,14 +115,14 @@ public class Hilbert2DStrategy extends CurveStrategy {
                 case 2:
                 case 3:
                 case 4:
-                    return new long[]{bX[(int)distance], bY[(int)distance]};
+                    return new long[]{bX.get((int)distance), bY.get((int)distance)};
                 case 5:
                 case 6:
                 case 7:
                 case 8:
-                    return new long[]{sX[(int)distance], sY[(int)distance]};
+                    return new long[]{bX.getShort((int)distance * 2), bY.getShort((int)distance * 2)};
                 default:
-                    return new long[]{iX[(int)distance], iY[(int)distance]};
+                    return new long[]{bX.getInt((int)distance * 4), bY.getInt((int)distance * 4)};
             }
         }
         return HilbertUtility.distanceToPoint(bits, DIMENSION, distance);
@@ -146,22 +150,22 @@ public class Hilbert2DStrategy extends CurveStrategy {
                 case 3:
                 case 4:
                     if(dimension == 0)
-                        return bX[(int)distance];
+                        return bX.get((int)distance);
                     else
-                        return bY[(int)distance];
+                        return bY.get((int)distance);
                 case 5:
                 case 6:
                 case 7:
                 case 8:
                     if(dimension == 0)
-                        return sX[(int)distance];
+                        return bX.getShort((int)distance * 2);
                     else
-                        return sY[(int)distance];
+                        return bY.getShort((int)distance * 2);
                 default:
                     if(dimension == 0)
-                        return iX[(int)distance];
+                        return bX.getInt((int)distance * 4);
                     else
-                        return iY[(int)distance];
+                        return bY.getInt((int)distance * 4);
             }
         }
         else
@@ -188,14 +192,14 @@ public class Hilbert2DStrategy extends CurveStrategy {
                 case 2:
                 case 3:
                 case 4:
-                    return bDist[(int)coordinates[0] + ((int)coordinates[1] << bits)];
+                    return bDist.get((int)(coordinates[0] | coordinates[1] << bits));
                 case 5:
                 case 6:
                 case 7:
                 case 8:
-                    return sDist[(int)coordinates[0] + ((int)coordinates[1] << bits)];
+                    return bDist.getShort((int)(coordinates[0] | coordinates[1] << bits) << 1);
                 default:
-                    return iDist[(int)coordinates[0] + ((int)coordinates[1] << bits)];
+                    return bDist.getInt((int)(coordinates[0] | coordinates[1] << bits) << 2);
             }
         }
         return pointToDistanceClosedForm(coordinates[0], coordinates[1]);

@@ -4,7 +4,7 @@ import org.junit.Test;
 
 import java.nio.ByteBuffer;
 
-import static com.github.tommyettinger.RegionPacker.*;
+import static com.github.tommyettinger.RegionPackerOriginal.*;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
