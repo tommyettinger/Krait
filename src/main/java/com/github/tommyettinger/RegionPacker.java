@@ -150,7 +150,7 @@ public class RegionPacker {
         int xSize = map.length, ySize = map[0].length;
         if(xSize > curve.dimensionality[0] || ySize > curve.dimensionality[1])
             throw new UnsupportedOperationException("Map size is too large for given CurveStrategy, aborting");
-        Region packing = new Region(curve.distanceByteSize, 64);
+        Region packing = new Region(64);
         boolean on = false, anyAdded = false, current;
         long skip = 0, limit = curve.maxDistance, mapLimit = xSize * ySize;
         long[] pt;
@@ -180,7 +180,7 @@ public class RegionPacker {
             packing.add(skip);
         else if(!anyAdded)
             return ALL_WALL;
-        return packing;
+        return packing.freeze();
     }
 
 
@@ -200,7 +200,7 @@ public class RegionPacker {
         int xSize = map.length, ySize = map[0].length;
         if(xSize > curve.dimensionality[0] || ySize > curve.dimensionality[1])
             throw new UnsupportedOperationException("Map size is too large for given CurveStrategy, aborting");
-        Region packing = new Region(curve.distanceByteSize, 64);
+        Region packing = new Region(64);
         boolean on = false, anyAdded = false, current;
         long skip = 0, limit = curve.maxDistance, mapLimit = xSize * ySize;
         long[] pt;
@@ -231,7 +231,7 @@ public class RegionPacker {
             packing.add(skip);
         else if(!anyAdded)
             return ALL_WALL;
-        return packing;
+        return packing.freeze();
     }
 
     /**

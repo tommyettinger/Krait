@@ -1,242 +1,480 @@
 package com.github.tommyettinger;
 
-import gnu.trove.list.array.TByteArrayList;
-import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.TLongCollection;
+import gnu.trove.function.TLongFunction;
 import gnu.trove.list.array.TLongArrayList;
-import gnu.trove.list.array.TShortArrayList;
+import gnu.trove.procedure.TLongProcedure;
+
+import java.util.Collection;
+import java.util.Random;
 
 /**
  * The primary form of data produced by RegionPacker, meant to be primarily used by that class.
  * Created by Tommy Ettinger on 2/15/2016.
  */
-public class Region {
-    protected TByteArrayList byteList;
-    protected TShortArrayList shortList;
-    protected TIntArrayList intList;
-    protected TLongArrayList longList;
-    protected int bytesPer;
-    public int size = 0;
+public class Region extends TLongArrayList {
     protected boolean frozen = false;
     public Region()
     {
-        bytesPer = 8;
-        longList = new TLongArrayList(16);
+        super();
     }
-    public Region(int bytesPerItem)
+    public Region(int capacity)
     {
-        if(bytesPerItem != 1 && bytesPerItem != 2 && bytesPerItem != 4)
-            bytesPer = 8;
-        else
-            bytesPer = bytesPerItem;
-
-        switch (bytesPer)
-        {
-            case 1: byteList = new TByteArrayList(16);
-                break;
-            case 2: shortList = new TShortArrayList(16);
-                break;
-            case 4: intList = new TIntArrayList(16);
-                break;
-            default: longList = new TLongArrayList(16);
-                break;
-        }
-    }
-    public Region(int bytesPerItem, int capacity)
-    {
-        if(bytesPerItem != 1 && bytesPerItem != 2 && bytesPerItem != 4)
-            bytesPer = 8;
-        else
-            bytesPer = bytesPerItem;
-
-        switch (bytesPer)
-        {
-            case 1: byteList = new TByteArrayList(capacity);
-                break;
-            case 2: shortList = new TShortArrayList(capacity);
-                break;
-            case 4: intList = new TIntArrayList(capacity);
-                break;
-            default: longList = new TLongArrayList(capacity);
-                break;
-        }
+        super(capacity);
     }
     public Region(long... values)
     {
-        bytesPer = 8;
-        longList = new TLongArrayList(values);
-        size = values.length;
+        super(values);
     }
     public Region(byte[] values)
     {
-        bytesPer = 1;
-        byteList = new TByteArrayList(values);
-        size = values.length;
+        super(Conversion.toLongs(values));
     }
     public Region(short[] values)
     {
-        bytesPer = 2;
-        shortList = new TShortArrayList(values);
-        size = values.length;
+        super(Conversion.toLongs(values));
     }
     public Region(int[] values)
     {
-        bytesPer = 4;
-        intList = new TIntArrayList(values);
-        size = values.length;
+        super(Conversion.toLongs(values));
     }
-    public void add(long value)
-    {
-        if(frozen)
-            throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
-        switch (bytesPer)
-        {
-            case 1: byteList.add((byte)value);
-                break;
-            case 2: shortList.add((short)value);
-                break;
-            case 4: intList.add((int)value);
-                break;
-            default: longList.add(value);
-                break;
-        }
-        size++;
+
+    /**
+     * Creates a new <code>TLongArrayList</code> instance with the
+     * specified capacity.
+     *
+     * @param capacity       an <code>int</code> value
+     * @param no_entry_value an <code>long</code> value that represents null.
+     */
+    public Region(int capacity, long no_entry_value) {
+        super(capacity, no_entry_value);
     }
-    public void addAll(long... values)
-    {
-        if(frozen)
-            throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
-        switch (bytesPer)
-        {
-            case 1:
-                for (int i = 0; i < values.length; i++) {
-                    byteList.add((byte) values[i]);
-                }
-                break;
-            case 2:
-                for (int i = 0; i < values.length; i++) {
-                    shortList.add((short) values[i]);
-                }
-                break;
-            case 4:
-                for (int i = 0; i < values.length; i++) {
-                    intList.add((int) values[i]);
-                }
-                break;
-            default: longList.addAll(values);
-                break;
-        }
-        size += values.length;
+
+    /**
+     * Creates a new <code>TLongArrayList</code> instance that contains
+     * a copy of the collection passed to us.
+     *
+     * @param collection the collection to copy
+     */
+    public Region(TLongCollection collection) {
+        super(collection);
     }
+
+    protected Region(long[] values, long no_entry_value, boolean wrap) {
+        super(values, no_entry_value, wrap);
+    }
+
+    /**
+     * Sheds any excess capacity above and beyond the current size of the list.
+     */
+    @Override
+    public void trimToSize() {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.trimToSize();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param val
+     */
+    @Override
+    public boolean add(long val) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        return super.add(val);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param vals
+     */
+    @Override
+    public void add(long[] vals) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.add(vals);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param vals
+     * @param offset
+     * @param length
+     */
+    @Override
+    public void add(long[] vals, int offset, int length) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.add(vals, offset, length);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param offset
+     * @param value
+     */
+    @Override
+    public void insert(int offset, long value) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.insert(offset, value);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param offset
+     * @param values
+     */
+    @Override
+    public void insert(int offset, long[] values) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.insert(offset, values);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param offset
+     * @param values
+     * @param valOffset
+     * @param len
+     */
+    @Override
+    public void insert(int offset, long[] values, int valOffset, int len) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.insert(offset, values, valOffset, len);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param offset
+     * @param val
+     */
+    @Override
+    public long replace(int offset, long val) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        return super.replace(offset, val);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param offset
+     * @param values
+     */
+    @Override
+    public void set(int offset, long[] values) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.set(offset, values);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param offset
+     * @param values
+     * @param valOffset
+     * @param length
+     */
+    @Override
+    public void set(int offset, long[] values, int valOffset, int length) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.set(offset, values, valOffset, length);
+    }
+
+    /**
+     * Sets the value at the specified offset without doing any bounds checking.
+     *
+     * @param offset
+     * @param val
+     */
+    @Override
+    public void setQuick(int offset, long val) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.setQuick(offset, val);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param value
+     */
+    @Override
+    public boolean remove(long value) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        return super.remove(value);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param offset
+     */
+    @Override
+    public long removeAt(int offset) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        return super.removeAt(offset);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param offset
+     * @param length
+     */
+    @Override
+    public void remove(int offset, int length) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.remove(offset, length);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param collection
+     */
+    @Override
+    public boolean addAll(Collection<? extends Long> collection) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        return super.addAll(collection);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param collection
+     */
+    @Override
+    public boolean addAll(TLongCollection collection) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        return super.addAll(collection);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param array
+     */
+    @Override
+    public boolean addAll(long[] array) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        return super.addAll(array);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param collection
+     */
+    @Override
+    public boolean retainAll(Collection<?> collection) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        return super.retainAll(collection);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param array
+     */
+    @Override
+    public boolean retainAll(long[] array) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        return super.retainAll(array);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param collection
+     */
+    @Override
+    public boolean retainAll(TLongCollection collection) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        return super.retainAll(collection);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param collection
+     */
+    @Override
+    public boolean removeAll(Collection<?> collection) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        return super.removeAll(collection);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param collection
+     */
+    @Override
+    public boolean removeAll(TLongCollection collection) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        return super.removeAll(collection);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param array
+     */
+    @Override
+    public boolean removeAll(long[] array) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        return super.removeAll(array);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param function
+     */
+    @Override
+    public void transformValues(TLongFunction function) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.transformValues(function);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void reverse() {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.reverse();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param from
+     * @param to
+     */
+    @Override
+    public void reverse(int from, int to) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.reverse(from, to);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param rand
+     */
+    @Override
+    public void shuffle(Random rand) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.shuffle(rand);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param procedure
+     */
+    @Override
+    public boolean forEach(TLongProcedure procedure) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        return super.forEach(procedure);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param procedure
+     */
+    @Override
+    public boolean forEachDescending(TLongProcedure procedure) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        return super.forEachDescending(procedure);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void sort() {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.sort();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param fromIndex
+     * @param toIndex
+     */
+    @Override
+    public void sort(int fromIndex, int toIndex) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.sort(fromIndex, toIndex);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param val
+     */
+    @Override
+    public void fill(long val) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.fill(val);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param fromIndex
+     * @param toIndex
+     * @param val
+     */
+    @Override
+    public void fill(int fromIndex, int toIndex, long val) {
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        super.fill(fromIndex, toIndex, val);
+    }
+
     public void addRange(long start, long end)
     {
-        if(frozen)
-            throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
+        if(frozen) throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
         if(end <= start)
             return;
-        switch (bytesPer)
-        {
-            case 1:
-                for (long i = start; i < end; i++) {
-                    byteList.add((byte) i);
-                }
-                break;
-            case 2:
-                for (long i = start; i < end; i++) {
-                    shortList.add((short) i);
-                }
-                break;
-            case 4:
-                for (long i = start; i < end; i++) {
-                    intList.add((int) i);
-                }
-                break;
-            default:
-                for (long i = start; i < end; i++) {
-                    longList.add(i);
-                }
-                break;
+        for (long i = start; i < end; i++) {
+            add(i);
         }
-        size += end - start;
     }
 
-    public long get(int index)
-    {
-        switch (bytesPer)
-        {
-            case 1: return byteList.getQuick(index);
-            case 2: return shortList.getQuick(index);
-            case 4: return intList.getQuick(index);
-            default: return longList.getQuick(index);
-        }
-    }
-    public int getBytesPerItem()
-    {
-        return bytesPer;
-    }
-
-    public void set(int index, long value)
-    {
-        if(frozen)
-            throw new UnsupportedOperationException("This Region has been frozen and cannot be mutated.");
-        switch (bytesPer)
-        {
-            case 1: byteList.setQuick(index, (byte)value);
-                break;
-            case 2: shortList.setQuick(index, (short)value);
-                break;
-            case 4: intList.setQuick(index, (int)value);
-                break;
-            default: longList.setQuick(index, value);
-                break;
-        }
-    }
     public byte[] asBytes()
     {
-        switch (bytesPer)
-        {
-            case 1: return byteList.toArray();
-            case 2: return Conversion.toBytes(shortList.toArray());
-            case 4: return Conversion.toBytes(intList.toArray());
-            default: return Conversion.toBytes(longList.toArray());
-        }
+        return Conversion.toBytes(toArray());
+
     }
 
     public short[] asShorts()
     {
-        switch (bytesPer)
-        {
-            case 1: return Conversion.toShorts(byteList.toArray());
-            case 2: return shortList.toArray();
-            case 4: return Conversion.toShorts(intList.toArray());
-            default: return Conversion.toShorts(longList.toArray());
-        }
+        return Conversion.toShorts(toArray());
+
     }
 
     public int[] asInts()
     {
-        switch (bytesPer)
-        {
-            case 1: return Conversion.toInts(byteList.toArray());
-            case 2: return Conversion.toInts(shortList.toArray());
-            case 4: return intList.toArray();
-            default: return Conversion.toInts(longList.toArray());
-        }
+         return Conversion.toInts(toArray());
     }
 
     public long[] asLongs()
     {
-        switch (bytesPer)
-        {
-            case 1: return Conversion.toLongs(byteList.toArray());
-            case 2: return Conversion.toLongs(shortList.toArray());
-            case 4: return Conversion.toLongs(intList.toArray());
-            default: return longList.toArray();
-        }
+        return toArray();
     }
 
-    public void freeze()
+    public Region freeze()
     {
         frozen = true;
+        return this;
     }
     public boolean isFrozen()
     {
@@ -244,33 +482,12 @@ public class Region {
     }
     public Region thaw()
     {
-        Region next = new Region(bytesPer, size);
-        switch (bytesPer)
-        {
-            case 1: next.byteList = byteList;
-                break;
-            case 2: next.shortList = shortList;
-                break;
-            case 4: next.intList = intList;
-                break;
-            default: next.longList = longList;
-        }
-        return next;
+        return new Region(this);
     }
 
     public Region copy()
     {
-        Region next = new Region(bytesPer, size);
-        switch (bytesPer)
-        {
-            case 1: next.byteList = byteList;
-                break;
-            case 2: next.shortList = shortList;
-                break;
-            case 4: next.intList = intList;
-                break;
-            default: next.longList = longList;
-        }
+        Region next = new Region(this);
         next.frozen = frozen;
         return next;
     }
@@ -279,16 +496,11 @@ public class Region {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
+        if (!super.equals(o)) return false;
 
         Region region = (Region) o;
 
-        if (bytesPer != region.bytesPer) return false;
-        if (size != region.size) return false;
-        if (frozen != region.frozen) return false;
-        if (byteList != null ? !byteList.equals(region.byteList) : region.byteList != null) return false;
-        if (shortList != null ? !shortList.equals(region.shortList) : region.shortList != null) return false;
-        if (intList != null ? !intList.equals(region.intList) : region.intList != null) return false;
-        return longList != null ? longList.equals(region.longList) : region.longList == null;
+        return frozen == region.frozen;
 
     }
 
@@ -296,12 +508,6 @@ public class Region {
     public int hashCode() {
         if(!frozen)
             return 0;
-        int result = byteList != null ? byteList.hashCode() : 0;
-        result = 31 * result + (shortList != null ? shortList.hashCode() : 0);
-        result = 31 * result + (intList != null ? intList.hashCode() : 0);
-        result = 31 * result + (longList != null ? longList.hashCode() : 0);
-        result = 31 * result + bytesPer;
-        result = 31 * result + size;
-        return result;
+        return super.hashCode();
     }
 }
