@@ -42,6 +42,7 @@ public class Hilbert2DStrategy extends CurveStrategy {
         side = HilbertUtility.nextPowerOfTwo(sideLength);
         dimensionality = new long[]{side, side};
         maxDistance = side * side;
+        distanceByteSize = calculateByteSize();
         bits = Long.numberOfTrailingZeros(side);
         //int xCoord = bits % 2 == 0 ? 0 : 1, yCoord = bits % 2 == 1 ? 0 : 1;
         if (maxDistance <= 0x100) {

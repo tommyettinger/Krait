@@ -176,6 +176,51 @@ public class CurveStrategyTest {
 
 
     @Test
+    public void testPuka()
+    {
+        System.out.println("Puka Curve");
+        PukaStrategy puka = new PukaStrategy();
+        System.out.println("Max distance: " + Long.toHexString(puka.maxDistance));
+        long[] pt = puka.point(0), pt2;
+        printlnPoint("Puka position 0", pt);
+        pt = puka.point(1);
+        printlnPoint("Puka position 1", pt);
+        pt = puka.point(4);
+        printlnPoint("Puka position 4", pt);
+        pt = puka.point(-1);
+        printlnPoint("Puka position end", pt);
+        pt = puka.point(0);
+        for (int i = 1; i < puka.maxDistance; i++) {
+            pt2 = puka.point(i);
+            assertEquals(1, Math.abs(pt[0] - pt2[0]) + Math.abs(pt[1] - pt2[1]) + Math.abs(pt[2] - pt2[2]));
+            pt = pt2;
+        }
+        System.out.println();
+    }
+
+    @Test
+    public void testPukaHilbert()
+    {
+        System.out.println("Puka-Hilbert Curve");
+        PukaHilbertStrategy ph = new PukaHilbertStrategy();
+        System.out.println("Max distance: " + Long.toHexString(ph.maxDistance));
+        long[] pt = ph.point(0), pt2;
+        printlnPoint("Puka-Hilbert position 0", pt);
+        pt = ph.point(1);
+        printlnPoint("Puka-Hilbert position 1", pt);
+        pt = ph.point(4);
+        printlnPoint("Puka-Hilbert position 4", pt);
+        pt = ph.point(-1);
+        printlnPoint("Puka-Hilbert position end", pt);
+        pt = ph.point(0);
+        for (int i = 1; i < ph.maxDistance; i++) {
+            pt2 = ph.point(i);
+            assertEquals(1, Math.abs(pt[0] - pt2[0]) + Math.abs(pt[1] - pt2[1]) + Math.abs(pt[2] - pt2[2]));
+            pt = pt2;
+        }
+        System.out.println();
+    }
+    @Test
     public void testGray() {
         for (int i = 0; i < 70; i++) {
             assertEquals(i, HilbertUtility.inverseGrayCode(HilbertUtility.grayCode(i)));

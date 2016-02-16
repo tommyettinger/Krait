@@ -24,7 +24,21 @@ public abstract class CurveStrategy {
      */
     public boolean stored;
 
-    protected static final long MASK = 0xffffffffffffffffL;
+    /**
+     * The number of bytes required to represent the maximum distance; for now, always 1, 2, 4, or 8.
+     */
+    public int distanceByteSize;
+
+    protected int calculateByteSize()
+    {
+        if(maxDistance <= 0x100L)
+            return 1;
+        if(maxDistance <= 0x10000L)
+            return 2;
+        if(maxDistance <= 0x100000000L)
+            return 4;
+        return 8;
+    }
 
     /**
      * Given a distance to travel along this space-filling curve, gets the corresponding point as an array of long

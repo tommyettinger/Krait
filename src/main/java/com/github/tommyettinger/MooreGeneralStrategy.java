@@ -61,6 +61,7 @@ public class MooreGeneralStrategy extends CurveStrategy {
         if(maxDistance > 0x4000000000000000L || maxDistance < 0)
             throw new UnsupportedOperationException("Moore Curve is too large or small, given dimension " + dimension +
             ", componentSideLength " + side + ", stretchAxis " + stretchAxis + ", stretch " + stretch);
+        distanceByteSize = calculateByteSize();
         dimensionality = new long[DIMENSION];
         Arrays.fill(dimensionality, side * 2);
         dimensionality[stretchAxis] = side * stretch;

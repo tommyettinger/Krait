@@ -9,7 +9,6 @@ See <http://creativecommons.org/publicdomain/zero/1.0/>. */
 package com.github.tommyettinger;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -244,26 +243,33 @@ public class RNG
         }
         return list.get(nextInt(list.size()));
     }
-
     /**
-     * Shuffle an array using the Fisher-Yates algorithm.
+     * Shuffle an array using the "inside-out" Fisher-Yates algorithm.
+     * <br>
+     * https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle#The_.22inside-out.22_algorithm
      * @param elements an array of T; will not be modified
      * @param <T> can be any non-primitive type.
-     * @return a shuffled copy of elements
+     * @param dest
+     * 			Where to put the shuffle. It MUST have the same length as {@code elements}
+     * @return {@code dest} after modifications
+     * @throws IllegalStateException
+     * 			If {@code dest.length != elements.length}
      */
-    public <T> T[] shuffle(T[] elements)
+    public <T> T[] shuffle(T[] elements, T[] dest)
     {
-        T[] array = elements.clone();
-        int n = array.length;
-        for (int i = 0; i < n; i++)
+        if (dest.length != elements.length)
+            throw new IllegalStateException("Input arrays must be of the same sizes");
+
+        for (int i = 0; i < elements.length; i++)
         {
-            int r = i + nextInt(n - i);
-            T t = array[r];
-            array[r] = array[i];
-            array[i] = t;
+            int r = nextInt(i + 1);
+            if(r != i)
+                dest[i] = dest[r];
+            dest[r] = elements[i];
         }
-        return array;
+        return dest;
     }
+
     /**
      * Shuffle a {@link List} using the Fisher-Yates algorithm.
      * @param elements a List of T; will not be modified
@@ -282,18 +288,37 @@ public class RNG
     }
 
     /**
-     * Gets a random portion of an array and returns it as a new array. Will only use a given position in the given
-     * array at most once; does this by shuffling a copy of the array and getting a section of it.
+     * Gets a random portion of data (an array), assigns that portion to output (an array) so that it fills as much as
+     * it can, and then returns output. Will only use a given position in the given data at most once; does this by
+     * generating random indices for data's elements, but only as much as needed, assigning the copied section to output
+     * and not modifying data.
+     *
+     * Based on http://stackoverflow.com/a/21460179 , credit to Vincent van der Weele; modifications were made to avoid
+     * copying or creating a new generic array (a problem on GWT).
      * @param data an array of T; will not be modified.
-     * @param count the non-negative number of elements to randomly take from data
+     * @param output an array of T that will be overwritten; should always be instantiated with the portion length
      * @param <T> can be any non-primitive type.
-     * @return an array of T that has length equal to the smaller of count or data.length
+     * @return an array of T that has length equal to output's length and may contain null elements if data is shorter
+     * than output
      */
-    public <T> T[] randomPortion(T[] data, int count)
+    public <T> T[] randomPortion(T[] data, T[] output)
     {
-        T[] array = Arrays.copyOf(data, Math.min(count, data.length));
-        System.arraycopy(shuffle(data), 0, array, 0, Math.min(count, data.length));
-        return array;
+        int length = data.length;
+        int[] mapping = new int[length];
+        for (int i = 0; i < length; i++) {
+            mapping[i] = i;
+        }
+
+        for (int i = 0; i < output.length; i++) {
+            int r = nextInt(length);
+
+            output[i] = data[mapping[r]];
+
+            mapping[r] = length-1;
+            length--;
+        }
+
+        return output;
     }
 
     /**
@@ -337,6 +362,7 @@ public class RNG
         System.arraycopy(data, 0, array, 0, Math.min(count, n));
         return array;
     }
+
     /**
      * Sets the current state of this generator (equivalent in behavior to making a new RNG with state as the seed, but
      * this is more efficient).

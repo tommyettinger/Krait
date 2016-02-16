@@ -51,6 +51,7 @@ public class PukaStrategy extends CurveStrategy {
 
         dimensionality = new long[]{side, side, side};
         maxDistance = 125;
+        distanceByteSize = 1;
 
         pukaX = new byte[]
                 {

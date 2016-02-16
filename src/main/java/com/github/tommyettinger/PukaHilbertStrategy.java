@@ -43,6 +43,7 @@ public class PukaHilbertStrategy extends CurveStrategy {
 
         dimensionality = new long[]{side, side, side};
         maxDistance = 64000;
+        distanceByteSize = 2;
         hilbert = new HilbertGeneralStrategy(3, 16);
         puka = new PukaStrategy();
         long[] start, end;

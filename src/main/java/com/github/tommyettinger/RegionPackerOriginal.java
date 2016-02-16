@@ -115,24 +115,181 @@ import java.util.Arrays;
  * Created by Tommy Ettinger on 10/1/2015.
  * @author Tommy Ettinger
  */
-public class RegionPacker {
+public class RegionPackerOriginal {
+    public static final int DEPTH = 8;
+    private static final int BITS = DEPTH << 1;
 
-    public static final Region ALL_WALL = new Region(8, 1), ALL_ON = new Region(0L, -1L);
-    public CurveStrategy curve;
-    public RegionPacker()
-    {
-        this(new Hilbert2DStrategy(256));
-    }
-    public RegionPacker(CurveStrategy curveStrategy)
-    {
-        curve = curveStrategy;
-    }
+    public static short[] hilbertX = new short[0x10000], hilbertY = new short[0x10000],
+            hilbertDistances = new short[0x10000], mooreX = new short[0x100], mooreY = new short[0x100],
+            mooreDistances = new short[0x100], hilbert3X = new short[0x1000], hilbert3Y = new short[0x1000],
+            hilbert3Z = new short[0x1000], hilbert3Distances = new short[0x1000],
+            ph3Distances = new short[64000],
+            ALL_WALL = new short[0], ALL_ON = new short[]{0, -1};
+    public static byte[] ph3X = new byte[64000], ph3Y = new byte[64000], ph3Z = new byte[64000];
+    /**
+     * X positions for the Puka Curve, a 5x5x5 potential "atom" for Hilbert Curves.
+     * One possible variant is http://i.imgur.com/IJzIkio.png
+     */
+    public static final byte[] pukaX = new byte[]
+            {
+                    0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 3, 3, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 4, 3, 3, 2, 2,
+                    3, 3, 4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 0, 1, 1, 0, 0,
+                    1, 1, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 3, 3, 4,
+                    4, 4, 3, 3, 3, 4, 4, 3, 3, 4, 4, 3, 3, 2, 2, 2, 2, 2, 1, 1, 0, 0, 0, 0, 1, 1, 1,
+                    0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0
+            }, pukaXreverse;
+    /**
+     * Y positions for the Puka Curve, a 5x5x5 potential "atom" for Hilbert Curves.
+     * One possible variant is http://i.imgur.com/IJzIkio.png
+     */
+    public static final byte[] pukaY = new byte[]
+            {
+                    0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 2,
+                    2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 3, 3, 3, 4, 4, 3, 3, 4, 4, 3, 3, 4, 4, 4, 4, 4, 3,
+                    3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2,
+                    3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 3, 3, 2, 2, 3, 3, 4, 4, 4, 4, 4, 4, 3, 3, 3, 3, 2,
+                    2, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 0, 0, 0, 0, 0, 0
+            }, pukaYreverse;
+    /**
+     * Z positions for the Puka Curve, a 5x5x5 potential "atom" for Hilbert Curves.
+     * One possible variant is http://i.imgur.com/IJzIkio.png
+     */
+    public static final byte[] pukaZ = new byte[]
+            {
+                    0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 0, 0, 0, 0,
+                    0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 0,
+                    0, 1, 1, 1, 0, 0, 1, 1, 2, 3, 3, 4, 4, 3, 3, 3, 4, 4, 4, 3, 3, 4, 4, 3, 3, 2, 2,
+                    2, 3, 3, 2, 2, 2, 3, 3, 4, 4, 4, 4, 4, 4, 4, 3, 3, 4, 4, 3, 3, 4, 4, 3, 3, 4, 4,
+                    4, 4, 4, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 3, 3, 4, 4
+            }, pukaZreverse;
+    public static final byte[][][] pukaRotations;
 
+    static {
+        Coord c;
+        for (int i = 0; i < 0x10000; i++) {
+            c = RegionPackerOriginal.hilbertToCoordNoLUT(i);
+            hilbertX[i] = (short) c.x;
+            hilbertY[i] = (short) c.y;
+            hilbertDistances[c.x + (c.y << 8)] = (short) i;
+        }
+        pukaXreverse = new byte[125];
+        pukaYreverse = new byte[125];
+        pukaZreverse = new byte[125];
+
+        for (int i = 0; i < 125; i++) {
+            pukaXreverse[i] = (byte)(4 - pukaX[i]);
+            pukaYreverse[i] = (byte)(4 - pukaY[i]);
+            pukaZreverse[i] = (byte)(4 - pukaZ[i]);
+        }
+
+        for (int x = 0; x < 16; x++) {
+            for (int y = 0; y < 16; y++) {
+                for (int z = 0; z < 16; z++) {
+                    computeHilbert3D(x, y, z);
+                }
+            }
+        }
+
+        pukaRotations = new byte[][][]{
+                new byte[][]{ // 0
+                        pukaZ, pukaX, pukaY
+                },
+                new byte[][]{ // 1
+                        pukaZ, pukaYreverse, pukaX
+                },
+                new byte[][]{ // 2
+                        pukaZ, pukaXreverse, pukaYreverse
+                },
+                new byte[][]{ // 3
+                        pukaZ, pukaY, pukaXreverse
+                },
+                new byte[][]{ // 4
+                        pukaX, pukaZ, pukaY
+                },
+                new byte[][]{ // 5
+                        pukaYreverse, pukaZ, pukaX
+                },
+                new byte[][]{ // 6
+                        pukaXreverse, pukaZ, pukaYreverse
+                },
+                new byte[][]{ // 7
+                        pukaY, pukaZ, pukaXreverse
+                },
+                new byte[][]{ // 8
+                        pukaX, pukaY, pukaZ
+                },
+                new byte[][]{ // 9
+                        pukaYreverse, pukaX, pukaZ
+                },
+                new byte[][]{ // 10
+                        pukaXreverse, pukaYreverse, pukaZ
+                },
+                new byte[][]{ // 11
+                        pukaY, pukaXreverse, pukaZ
+                },
+                new byte[][]{ // 12
+                        pukaZreverse, pukaX, pukaY
+                },
+                new byte[][]{ // 13
+                        pukaZreverse, pukaYreverse, pukaX
+                },
+                new byte[][]{ // 14
+                        pukaZreverse, pukaXreverse, pukaYreverse
+                },
+                new byte[][]{ // 15
+                        pukaZreverse, pukaY, pukaXreverse
+                },
+                new byte[][]{ // 16
+                        pukaX, pukaZreverse, pukaY
+                },
+                new byte[][]{ // 17
+                        pukaYreverse, pukaZreverse, pukaX
+                },
+                new byte[][]{ // 18
+                        pukaXreverse, pukaZreverse, pukaYreverse
+                },
+                new byte[][]{ // 19
+                        pukaY, pukaZreverse, pukaXreverse
+                },
+                new byte[][]{ // 20
+                        pukaX, pukaY, pukaZreverse
+                },
+                new byte[][]{ // 21
+                        pukaYreverse, pukaX, pukaZreverse
+                },
+                new byte[][]{ // 22
+                        pukaXreverse, pukaYreverse, pukaZreverse
+                },
+                new byte[][]{ // 23
+                        pukaY, pukaXreverse, pukaZreverse
+                }
+        };
+
+        computePukaHilbert3D();
+
+        for (int i = 64; i < 128; i++) {
+            mooreX[i - 64] = hilbertX[i];
+            mooreY[i - 64] = hilbertY[i];
+            mooreDistances[mooreX[i - 64] + (mooreY[i - 64] << 4)] = (short)(i - 64);
+
+            mooreX[i] = hilbertX[i];
+            mooreY[i] = (short)(hilbertY[i] + 8);
+            mooreDistances[mooreX[i] + (mooreY[i] << 4)] = (short)(i);
+
+            mooreX[i + 64] = (short)(15 - hilbertX[i]);
+            mooreY[i + 64] = (short)(15 - hilbertY[i]);
+            mooreDistances[mooreX[i + 64] + (mooreY[i + 64] << 4)] = (short)(i + 64);
+
+            mooreX[i + 128] = (short)(15 - hilbertX[i]);
+            mooreY[i + 128] = (short)(7 - hilbertY[i]);
+            mooreDistances[mooreX[i + 128] + (mooreY[i + 128] << 4)] = (short)(i + 128);
+        }
+    }
 
     /**
      * Compresses a double[][] that only stores two
      * relevant states (one of which should be 0 or less, the other greater than 0), returning a short[] as described in
-     * the {@link RegionPacker} class documentation. This short[] can be passed to RegionPacker.unpack() to restore the
+     * the {@link RegionPackerOriginal} class documentation. This short[] can be passed to RegionPacker.unpack() to restore the
      * relevant states and their positions as a boolean[][] (with false meaning 0 or less and true being any double
      * greater than 0). As stated in the class documentation, the compressed result is intended to use as little memory
      * as possible for 2D arrays with contiguous areas of "on" cells.
@@ -143,49 +300,206 @@ public class RegionPacker {
      *            will not meaningfully compress with this method.
      * @return a packed short[] that should, in most circumstances, be passed to unpack() when it needs to be used.
      */
-    public Region pack(double[][] map)
+    public static short[] pack(double[][] map)
     {
         if(map == null || map.length == 0)
             throw new ArrayIndexOutOfBoundsException("RegionPacker.pack() must be given a non-empty array");
         int xSize = map.length, ySize = map[0].length;
-        if(xSize > curve.dimensionality[0] || ySize > curve.dimensionality[1])
-            throw new UnsupportedOperationException("Map size is too large for given CurveStrategy, aborting");
-        Region packing = new Region(curve.distanceByteSize, 64);
+        if(xSize > 256 || ySize > 256)
+            throw new UnsupportedOperationException("Map size is too large to efficiently pack, aborting");
+        ShortVLA packing = new ShortVLA(64);
         boolean on = false, anyAdded = false, current;
-        long skip = 0, limit = curve.maxDistance, mapLimit = xSize * ySize;
-        long[] pt;
-        for(long i = 0, ml = 0; i < limit && ml < mapLimit; i++, skip++)
+        int skip = 0, limit = 0x10000, mapLimit = xSize * ySize;
+        if(ySize <= 128) {
+            limit >>= 1;
+            if (xSize <= 128) {
+                limit >>= 1;
+                if (xSize <= 64) {
+                    limit >>= 1;
+                    if (ySize <= 64) {
+                        limit >>= 1;
+                        if (ySize <= 32) {
+                            limit >>= 1;
+                            if (xSize <= 32) {
+                                limit >>= 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        for(int i = 0, ml = 0; i < limit && ml < mapLimit; i++, skip++)
         {
-            pt = curve.point(i);
-            if(pt[0] >= xSize || pt[1] >= ySize) {
+            if(hilbertX[i] >= xSize || hilbertY[i] >= ySize) {
                 if(on) {
                     on = false;
-                    packing.add(skip);
+                    packing.add((short) skip);
                     skip = 0;
                     anyAdded = true;
                 }
                 continue;
             }
             ml++;
-            current = map[(int)pt[0]][(int)pt[1]] > 0.0;
+            current = map[hilbertX[i]][hilbertY[i]] > 0.0;
             if(current != on)
             {
-                packing.add(skip);
+                packing.add((short) skip);
                 skip = 0;
                 on = current;
                 anyAdded = true;
             }
         }
         if(on)
-            packing.add(skip);
+            packing.add((short)skip);
         else if(!anyAdded)
             return ALL_WALL;
-        return packing;
+        return packing.toArray();
     }
 
+    /**
+     * Compresses a double[][] that only stores two relevant states (one of which should be equal to or less than
+     * threshold, the other greater than threshold), returning a short[] as described in the {@link RegionPackerOriginal} class
+     * documentation. This short[] can be passed to RegionPacker.unpack() to restore the relevant states and their
+     * positions as a boolean[][] (with true meaning threshold or less and false being any double greater than
+     * threshold). As stated in the class documentation, the compressed result is intended to use as little memory as
+     * possible for 2D arrays with contiguous areas of "on" cells.
+     * <br>
+     * <b>To store more than two states</b>, you should use packMulti().
+     *
+     * @param map a double[][] that probably relates in some way to DijkstraMap.
+     * @param threshold any double greater than this will be off, any equal or less will be on
+     * @return a packed short[] that should, in most circumstances, be passed to unpack() when it needs to be used.
+     */
+    public static short[] pack(double[][] map, double threshold)
+    {
+        if(map == null || map.length == 0)
+            throw new ArrayIndexOutOfBoundsException("RegionPacker.pack() must be given a non-empty array");
+        int xSize = map.length, ySize = map[0].length;
+        if(xSize > 256 || ySize > 256)
+            throw new UnsupportedOperationException("Map size is too large to efficiently pack, aborting");
+        ShortVLA packing = new ShortVLA(64);
+        boolean on = false, anyAdded = false, current;
+        int skip = 0, limit = 0x10000, mapLimit = xSize * ySize;
+        if(ySize <= 128) {
+            limit >>= 1;
+            if (xSize <= 128) {
+                limit >>= 1;
+                if (xSize <= 64) {
+                    limit >>= 1;
+                    if (ySize <= 64) {
+                        limit >>= 1;
+                        if (ySize <= 32) {
+                            limit >>= 1;
+                            if (xSize <= 32) {
+                                limit >>= 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        for(int i = 0, ml = 0; i < limit && ml < mapLimit; i++, skip++)
+        {
+            if(hilbertX[i] >= xSize || hilbertY[i] >= ySize) {
+                if(on) {
+                    on = false;
+                    packing.add((short) skip);
+                    skip = 0;
+                    anyAdded = true;
+                }
+                continue;
+            }
+            ml++;
+            current = map[hilbertX[i]][hilbertY[i]] <= threshold;
+            if(current != on)
+            {
+                packing.add((short) skip);
+                skip = 0;
+                on = current;
+                anyAdded = true;
+            }
+        }
+        if(on)
+            packing.add((short)skip);
+        else if(!anyAdded)
+            return ALL_WALL;
+        return packing.toArray();
+    }
 
     /**
-     * Compresses a boolean[][], returning a short[] as described in the {@link RegionPacker} class documentation. This
+     * Compresses a byte[][] (typically one generated by an FOV-like method) that only stores two
+     * relevant states (one of which should be 0 or less, the other greater than 0), returning a short[] as described in
+     * the {@link RegionPackerOriginal} class documentation. This short[] can be passed to RegionPacker.unpack() to restore the
+     * relevant states and their positions as a boolean[][] (with false meaning 0 or less and true being any byte
+     * greater than 0). As stated in the class documentation, the compressed result is intended to use as little memory
+     * as possible for 2D arrays with contiguous areas of "on" cells.
+     *<br>
+     * <b>To store more than two states</b>, you should use packMulti().
+     *
+     * @param map a byte[][] that probably was returned by an FOV-like method.
+     * @return a packed short[] that should, in most circumstances, be passed to unpack() when it needs to be used.
+     */
+    public static short[] pack(byte[][] map)
+    {
+        if(map == null || map.length == 0)
+            throw new ArrayIndexOutOfBoundsException("RegionPacker.pack() must be given a non-empty array");
+        int xSize = map.length, ySize = map[0].length;
+        if(xSize > 256 || ySize > 256)
+            throw new UnsupportedOperationException("Map size is too large to efficiently pack, aborting");
+        ShortVLA packing = new ShortVLA(64);
+        boolean on = false, anyAdded = false, current;
+        int skip = 0, limit = 0x10000, mapLimit = xSize * ySize;
+        if(ySize <= 128) {
+            limit >>= 1;
+            if (xSize <= 128) {
+                limit >>= 1;
+                if (xSize <= 64) {
+                    limit >>= 1;
+                    if (ySize <= 64) {
+                        limit >>= 1;
+                        if (ySize <= 32) {
+                            limit >>= 1;
+                            if (xSize <= 32) {
+                                limit >>= 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        for(int i = 0, ml = 0; i < limit && ml < mapLimit; i++, skip++)
+        {
+            if(hilbertX[i] >= xSize || hilbertY[i] >= ySize) {
+                if(on) {
+                    on = false;
+                    packing.add((short) skip);
+                    skip = 0;
+                    anyAdded = true;
+                }
+                continue;
+            }
+            ml++;
+            current = map[hilbertX[i]][hilbertY[i]] > 0;
+            if(current != on)
+            {
+                packing.add((short) skip);
+                skip = 0;
+                on = current;
+                anyAdded = true;
+            }
+        }
+        if(on)
+            packing.add((short)skip);
+        else if(!anyAdded)
+            return ALL_WALL;
+        return packing.toArray();
+    }
+
+    /**
+     * Compresses a boolean[][], returning a short[] as described in the {@link RegionPackerOriginal} class documentation. This
      * short[] can be passed to RegionPacker.unpack() to restore the relevant states and their positions as a boolean[][]
      * As stated in the class documentation, the compressed result is intended to use as little memory as possible for
      * 2D arrays with contiguous areas of "on" cells.
@@ -193,51 +507,66 @@ public class RegionPacker {
      * @param map a boolean[][] that should ideally be mostly false.
      * @return a packed short[] that should, in most circumstances, be passed to unpack() when it needs to be used.
      */
-    public Region pack(boolean[][] map)
+    public static short[] pack(boolean[][] map)
     {
         if(map == null || map.length == 0)
             throw new ArrayIndexOutOfBoundsException("RegionPacker.pack() must be given a non-empty array");
         int xSize = map.length, ySize = map[0].length;
-        if(xSize > curve.dimensionality[0] || ySize > curve.dimensionality[1])
-            throw new UnsupportedOperationException("Map size is too large for given CurveStrategy, aborting");
-        Region packing = new Region(curve.distanceByteSize, 64);
+        if(xSize > 256 || ySize > 256)
+            throw new UnsupportedOperationException("Map size is too large to efficiently pack, aborting");
+        ShortVLA packing = new ShortVLA(64);
         boolean on = false, anyAdded = false, current;
-        long skip = 0, limit = curve.maxDistance, mapLimit = xSize * ySize;
-        long[] pt;
-
-        for(long i = 0, ml = 0; i < limit && ml < mapLimit; i++, skip++)
+        int skip = 0, limit = 0x10000, mapLimit = xSize * ySize;
+        if(ySize <= 128) {
+            limit >>= 1;
+            if (xSize <= 128) {
+                limit >>= 1;
+                if (xSize <= 64) {
+                    limit >>= 1;
+                    if (ySize <= 64) {
+                        limit >>= 1;
+                        if (ySize <= 32) {
+                            limit >>= 1;
+                            if (xSize <= 32) {
+                                limit >>= 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for(int i = 0, ml = 0; i < limit && ml < mapLimit; i++, skip++)
         {
-            pt = curve.point(i);
-            if(pt[0] >= xSize || pt[1] >= ySize) {
+            if(hilbertX[i] >= xSize || hilbertY[i] >= ySize) {
                 if(on) {
                     on = false;
-                    packing.add(skip);
+                    packing.add((short) skip);
                     skip = 0;
                     anyAdded = true;
                 }
                 continue;
             }
             ml++;
-            current = map[(int)pt[0]][(int)pt[1]];
+            current = map[hilbertX[i]][hilbertY[i]];
             if(current != on)
             {
-                packing.add(skip);
+                packing.add((short) skip);
                 skip = 0;
                 on = current;
                 anyAdded = true;
             }
         }
         if(on)
-            packing.add(skip);
+            packing.add((short)skip);
         else if(!anyAdded)
             return ALL_WALL;
-        return packing;
+        return packing.toArray();
     }
 
     /**
      * Compresses a char[][] (typically one generated by a map generating method) sp only the cells that equal the yes
      * parameter will be encoded as "on", returning a short[] as described in
-     * the {@link RegionPacker} class documentation. This short[] can be passed to RegionPacker.unpack() to restore the
+     * the {@link RegionPackerOriginal} class documentation. This short[] can be passed to RegionPacker.unpack() to restore the
      * positions of chars that equal the parameter yes as a boolean[][] (with false meaning not equal and true equal to
      * yes). As stated in the class documentation, the compressed result is intended to use as little memory
      * as possible for 2D arrays with contiguous areas of "on" cells.
@@ -366,7 +695,7 @@ public class RegionPacker {
     /**
      * Compresses a double[][] that stores any number of
      * states and a double[] storing up to 63 states, ordered from lowest to highest, returning a short[][] as described
-     * in the {@link RegionPacker} class documentation. This short[][] can be passed to RegionPacker.unpackMultiDouble()
+     * in the {@link RegionPackerOriginal} class documentation. This short[][] can be passed to RegionPacker.unpackMultiDouble()
      * to restore the state at a position to the nearest state in levels, rounded down, and return a double[][] that
      * should preserve the states as closely as intended for most purposes. <b>For compressing FOV, you should generate
      * levels with RegionPacker.generatePackingLevels()</b> instead of manually creating the array, because some
@@ -475,7 +804,7 @@ public class RegionPacker {
 
     /**
      * Compresses a byte[][] that stores any number
-     * of states and an int no more than 63, returning a short[][] as described in the {@link RegionPacker} class
+     * of states and an int no more than 63, returning a short[][] as described in the {@link RegionPackerOriginal} class
      * documentation. This short[][] can be passed to RegionPacker.unpackMultiByte() to restore the state at a position
      * to the nearest state possible, capped at levelCount, and return a byte[][] that should preserve the states as
      * closely as intended for most purposes.
@@ -574,7 +903,7 @@ public class RegionPacker {
 
     /**
      * Decompresses a short[] returned by pack() or a sub-array of a short[][] returned by packMulti(), as described in
-     * the {@link RegionPacker} class documentation. This returns a boolean[][] that stores the same values that were
+     * the {@link RegionPackerOriginal} class documentation. This returns a boolean[][] that stores the same values that were
      * packed if the overload of pack() taking a boolean[][] was used. If a double[][] was compressed with pack(), the
      * boolean[][] this returns will have true for all values greater than 0 and false for all others. If this is one
      * of the sub-arrays compressed by packMulti(), the index of the sub-array will correspond to an index in the levels
@@ -614,7 +943,7 @@ public class RegionPacker {
 
     /**
      * Decompresses a short[] returned by pack() or a sub-array of a short[][] returned by packMulti(), as described in
-     * the {@link RegionPacker} class documentation. This returns a double[][] that stores 1.0 for true and 0.0 for
+     * the {@link RegionPackerOriginal} class documentation. This returns a double[][] that stores 1.0 for true and 0.0 for
      * false if the overload of pack() taking a boolean[][] was used. If a double[][] was compressed with pack(), the
      * double[][] this returns will have 1.0 for all values greater than 0 and 0.0 for all others. If this is one
      * of the sub-arrays compressed by packMulti(), the index of the sub-array will correspond to an index in the levels
@@ -654,7 +983,7 @@ public class RegionPacker {
 
     /**
      * Decompresses a short[] returned by pack() or a sub-array of a short[][] returned by packMulti(), as described in
-     * the {@link RegionPacker} class documentation. This returns a double[][] that stores 1.0 for true and 0.0 for
+     * the {@link RegionPackerOriginal} class documentation. This returns a double[][] that stores 1.0 for true and 0.0 for
      * false if the overload of pack() taking a boolean[][] was used. If a double[][] was compressed with pack(), the
      * double[][] this returns will have 1.0 for all values greater than 0 and 0.0 for all others. If this is one
      * of the sub-arrays compressed by packMulti(), the index of the sub-array will correspond to an index in the levels
@@ -702,7 +1031,7 @@ public class RegionPacker {
 
     /**
      * Decompresses a short[][] returned by packMulti() and produces an approximation of the double[][] it compressed
-     * using the given levels double[] as the values to assign, as described in the {@link RegionPacker} class
+     * using the given levels double[] as the values to assign, as described in the {@link RegionPackerOriginal} class
      * documentation. The length of levels and the length of the outer array of packed must be equal. However, the
      * levels array passed to this method should not be identical to the levels array passed to packMulti(); for FOV
      * compression, you should get an array for levels using generatePackingLevels(), but for decompression, you should
@@ -756,7 +1085,7 @@ public class RegionPacker {
     /**
      * Decompresses a short[][] returned by packMulti() and produces an approximation of the double[][] it compressed
      * using the given levels double[] as the values to assign, but only using the innermost indices up to limit, as
-     * described in the {@link RegionPacker} class documentation. The length of levels and the length of the outer array
+     * described in the {@link RegionPackerOriginal} class documentation. The length of levels and the length of the outer array
      * of packed do not have to be equal. However, the levels array passed to this method should not be identical to the
      * levels array passed to packMulti(); for FOV compression, you should get an array for levels using
      * generatePackingLevels(), but for decompression, you should create levels using generateLightLevels(), which
@@ -814,7 +1143,7 @@ public class RegionPacker {
     /**
      * Decompresses a short[][] returned by packMulti() and produces an approximation of the double[][] it compressed
      * using the given levels double[] as the values to assign, but only using the innermost indices up to limit, as
-     * described in the {@link RegionPacker} class documentation. The length of levels and the length of the outer array
+     * described in the {@link RegionPackerOriginal} class documentation. The length of levels and the length of the outer array
      * of packed do not have to be equal. However, the levels array passed to this method should not be identical to the
      * levels array passed to packMulti(); for FOV compression, you should get an array for levels using
      * generatePackingLevels(), but for decompression, you should create levels using generateLightLevels(), which
@@ -887,7 +1216,7 @@ public class RegionPacker {
      * Decompresses a short[][] returned by packMulti() and produces a simple 2D array where the values are bytes
      * corresponding to 1 + the highest index into levels (that is, the original levels parameter passed to packMulti)
      * matched by a cell, or 0 if the cell didn't match any levels during compression, as described in the
-     * {@link RegionPacker} class documentation. Width and height do not technically need to match the dimensions of
+     * {@link RegionPackerOriginal} class documentation. Width and height do not technically need to match the dimensions of
      * the original 2D array, but under most circumstances where they don't match, the data produced will be junk.
      * @param packed a short[][] encoded by calling this class' packMulti() method on a 2D array.
      * @param width the width of the 2D array that will be returned; should match the unpacked array's width.

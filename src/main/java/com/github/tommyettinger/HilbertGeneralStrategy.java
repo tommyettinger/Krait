@@ -69,6 +69,7 @@ public class HilbertGeneralStrategy extends CurveStrategy {
         dimensionality = new long[DIMENSION];
         Arrays.fill(dimensionality, side);
         maxDistance = 1 << (bits * DIMENSION);
+        distanceByteSize = calculateByteSize();
         if (maxDistance <= 0x100) {
             bVals = new byte[(int)maxDistance][DIMENSION];
             bDist = new byte[(int)maxDistance];
@@ -104,7 +105,7 @@ public class HilbertGeneralStrategy extends CurveStrategy {
                 for (int j = 0; j < DIMENSION; j++) {
                     iVals[i][j] = (int) c[j];
                 }
-                iDist[lookup(c)] = (int) i;
+                iDist[lookup(c)] = i;
             }
             stored = true;
 
