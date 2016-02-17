@@ -1,6 +1,7 @@
 package com.github.tommyettinger;
 
 import com.gs.collections.api.PrimitiveIterable;
+import com.gs.collections.api.block.procedure.primitive.*;
 import com.gs.collections.api.list.primitive.MutableByteList;
 import com.gs.collections.api.list.primitive.MutableIntList;
 import com.gs.collections.api.list.primitive.MutableLongList;
@@ -128,6 +129,37 @@ public class Region {
             case 4: ((MutableIntList)list).add((int)value);
                 break;
             default: ((MutableLongList)list).add(value);
+                break;
+        }
+        size++;
+    }
+    public void prepend(long value)
+    {
+        switch (bytesPer)
+        {
+            case 1: ((MutableByteList)list).addAtIndex(0, (byte)value);
+                break;
+            case 2: ((MutableShortList)list).addAtIndex(0, (short)value);
+                break;
+            case 4: ((MutableIntList)list).addAtIndex(0, (int)value);
+                break;
+            default: ((MutableLongList)list).addAtIndex(0, value);
+                break;
+        }
+        size++;
+    }
+
+    public void addAt(int index, long value)
+    {
+        switch (bytesPer)
+        {
+            case 1: ((MutableByteList)list).addAtIndex(index, (byte)value);
+                break;
+            case 2: ((MutableShortList)list).addAtIndex(index, (short)value);
+                break;
+            case 4: ((MutableIntList)list).addAtIndex(index, (int)value);
+                break;
+            default: ((MutableLongList)list).addAtIndex(index, value);
                 break;
         }
         size++;
@@ -399,14 +431,272 @@ public class Region {
     {
         switch (bytesPer) {
             case 1:
-                return new Region((MutableByteList) list);
+                return new Region(ByteArrayList.newList((MutableByteList) list));
             case 2:
-                return new Region((MutableShortList) list);
+                return new Region(ShortArrayList.newList((MutableShortList) list));
             case 4:
-                return new Region((MutableIntList) list);
+                return new Region(IntArrayList.newList((MutableIntList) list));
             default:
-                return new Region((MutableLongList) list);
+                return new Region(LongArrayList.newList((MutableLongList) list));
         }
     }
 
+    public Region freeze()
+    {
+        switch (bytesPer) {
+            case 1:
+                list = ((MutableByteList)list).asUnmodifiable();
+                break;
+            case 2:
+                list = ((MutableShortList)list).asUnmodifiable();
+                break;
+            case 4:
+                list = ((MutableIntList)list).asUnmodifiable();
+                break;
+            default:
+                list = ((MutableLongList)list).asUnmodifiable();
+                break;
+        }
+        return this;
+    }
+    public Region forEach(final LongProcedure procedure)
+    {
+        switch (bytesPer) {
+            case 1:
+                ((MutableByteList)list).forEach(new ByteProcedure() {
+                    public void value(byte each) { procedure.value(MASK32 & each); }
+                });
+                break;
+            case 2:
+                ((MutableShortList)list).forEach(new ShortProcedure() {
+                    public void value(short each) { procedure.value(MASK32 & each); }
+                });
+                break;
+            case 4:
+                ((MutableIntList)list).forEach(new IntProcedure() {
+                    public void value(int each) { procedure.value(MASK32 & each); }
+                });
+                break;
+            default:
+                ((MutableLongList)list).forEach(procedure);
+                break;
+        }
+        return this;
+    }
+
+    public Region forEach(final IntProcedure procedure)
+    {
+        switch (bytesPer) {
+            case 1:
+                ((MutableByteList)list).forEach(new ByteProcedure() {
+                    public void value(byte each) { procedure.value(MASK16 & each); }
+                });
+                break;
+            case 2:
+                ((MutableShortList)list).forEach(new ShortProcedure() {
+                    public void value(short each) { procedure.value(MASK16 & each); }
+                });
+                break;
+            case 4:
+                ((MutableIntList)list).forEach(procedure);
+                break;
+            default:
+                ((MutableLongList)list).forEach(new LongProcedure() {
+                    public void value(long each) { procedure.value((int)each); }
+                });
+                break;
+        }
+        return this;
+    }
+
+    public Region forEach(final ShortProcedure procedure)
+    {
+        switch (bytesPer) {
+            case 1:
+                ((MutableByteList)list).forEach(new ByteProcedure() {
+                    public void value(byte each) { procedure.value((short) (MASK8 & each)); }
+                });
+                break;
+            case 2:
+                ((MutableShortList)list).forEach(procedure);
+                break;
+            case 4:
+                ((MutableIntList)list).forEach(new IntProcedure() {
+                    public void value(int each) { procedure.value((short) each); }
+                });
+                break;
+            default:
+                ((MutableLongList)list).forEach(new LongProcedure() {
+                    public void value(long each) { procedure.value((short) each); }
+                });
+                break;
+        }
+        return this;
+    }
+
+    public Region forEach(final ByteProcedure procedure)
+    {
+        switch (bytesPer) {
+            case 1:
+                ((MutableByteList)list).forEach(procedure);
+                break;
+            case 2:
+                ((MutableShortList)list).forEach(new ShortProcedure() {
+                    public void value(short each) { procedure.value((byte) each); }
+                });
+                break;
+            case 4:
+                ((MutableIntList)list).forEach(new IntProcedure() {
+                    public void value(int each) { procedure.value((byte) each); }
+                });
+                break;
+            default:
+                ((MutableLongList)list).forEach(new LongProcedure() {
+                    public void value(long each) { procedure.value((byte) each); }
+                });
+                break;
+        }
+        return this;
+    }
+
+    public Region forEachAlternating(final LongBooleanProcedure procedure)
+    {
+        switch (bytesPer) {
+            case 1:
+                ((MutableByteList)list).forEachWithIndex(new ByteIntProcedure() {
+                    public void value(byte each, int index) {
+                        procedure.value(MASK32 & each, index % 2 == 1);
+                    }
+                });
+                break;
+            case 2:
+                ((MutableShortList)list).forEachWithIndex(new ShortIntProcedure() {
+                    public void value(short each, int index) {
+                        procedure.value(MASK32 & each, index % 2 == 1);
+                    }
+                });
+                break;
+            case 4:
+                ((MutableIntList)list).forEachWithIndex(new IntIntProcedure() {
+                    public void value(int each, int index) {
+                        procedure.value(MASK32 & each, index % 2 == 1);
+                    }
+                });
+                break;
+            default:
+                ((MutableLongList)list).forEachWithIndex(new LongIntProcedure() {
+                    public void value(long each, int index) {
+                        procedure.value(each, index % 2 == 1);
+                    }
+                });
+                break;
+        }
+        return this;
+    }
+
+    public Region forEachAlternating(final IntBooleanProcedure procedure)
+    {
+        switch (bytesPer) {
+            case 1:
+                ((MutableByteList)list).forEachWithIndex(new ByteIntProcedure() {
+                    public void value(byte each, int index) {
+                        procedure.value(MASK16 & each, index % 2 == 1);
+                    }
+                });
+                break;
+            case 2:
+                ((MutableShortList)list).forEachWithIndex(new ShortIntProcedure() {
+                    public void value(short each, int index) {
+                        procedure.value(MASK16 & each, index % 2 == 1);
+                    }
+                });
+                break;
+            case 4:
+                ((MutableIntList)list).forEachWithIndex(new IntIntProcedure() {
+                    public void value(int each, int index) {
+                        procedure.value(each, index % 2 == 1);
+                    }
+                });
+                break;
+            default:
+                ((MutableLongList)list).forEachWithIndex(new LongIntProcedure() {
+                    public void value(long each, int index) {
+                        procedure.value((int)each, index % 2 == 1);
+                    }
+                });
+                break;
+        }
+        return this;
+    }
+
+    public Region forEachAlternating(final ShortBooleanProcedure procedure)
+    {
+        switch (bytesPer) {
+            case 1:
+                ((MutableByteList)list).forEachWithIndex(new ByteIntProcedure() {
+                    public void value(byte each, int index) {
+                        procedure.value((short) (MASK8 & each), index % 2 == 1);
+                    }
+                });
+                break;
+            case 2:
+                ((MutableShortList)list).forEachWithIndex(new ShortIntProcedure() {
+                    public void value(short each, int index) {
+                        procedure.value(each, index % 2 == 1);
+                    }
+                });
+                break;
+            case 4:
+                ((MutableIntList)list).forEachWithIndex(new IntIntProcedure() {
+                    public void value(int each, int index) {
+                        procedure.value((short) each, index % 2 == 1);
+                    }
+                });
+                break;
+            default:
+                ((MutableLongList)list).forEachWithIndex(new LongIntProcedure() {
+                    public void value(long each, int index) {
+                        procedure.value((short) each, index % 2 == 1);
+                    }
+                });
+                break;
+        }
+        return this;
+    }
+
+
+    public Region forEachAlternating(final ByteBooleanProcedure procedure)
+    {
+        switch (bytesPer) {
+            case 1:
+                ((MutableByteList)list).forEachWithIndex(new ByteIntProcedure() {
+                    public void value(byte each, int index) {
+                        procedure.value(each, index % 2 == 1);
+                    }
+                });
+                break;
+            case 2:
+                ((MutableShortList)list).forEachWithIndex(new ShortIntProcedure() {
+                    public void value(short each, int index) {
+                        procedure.value((byte)each, index % 2 == 1);
+                    }
+                });
+                break;
+            case 4:
+                ((MutableIntList)list).forEachWithIndex(new IntIntProcedure() {
+                    public void value(int each, int index) {
+                        procedure.value((byte) each, index % 2 == 1);
+                    }
+                });
+                break;
+            default:
+                ((MutableLongList)list).forEachWithIndex(new LongIntProcedure() {
+                    public void value(long each, int index) {
+                        procedure.value((byte) each, index % 2 == 1);
+                    }
+                });
+                break;
+        }
+        return this;
+    }
 }
