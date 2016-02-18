@@ -29,7 +29,7 @@ public class HilbertGeneralStrategy extends CurveStrategy {
     /**
      * Side length of the square.
      */
-    public long side;
+    public int side;
     public final int DIMENSION;
 
     /**
@@ -49,7 +49,7 @@ public class HilbertGeneralStrategy extends CurveStrategy {
      * @param sideLength the length of a side, which will be rounded up to the next-higher power of two if it isn't
      *                   already a power of two. sideLength ^ dimension must be no greater than 2^63.
      */
-    public HilbertGeneralStrategy(int dimension, long sideLength) {
+    public HilbertGeneralStrategy(int dimension, int sideLength) {
         if(dimension > 31)
             dimension = 31;
         DIMENSION = dimension;
@@ -66,14 +66,14 @@ public class HilbertGeneralStrategy extends CurveStrategy {
             side = 1 << bits;
         }
 
-        dimensionality = new long[DIMENSION];
+        dimensionality = new int[DIMENSION];
         Arrays.fill(dimensionality, side);
         maxDistance = 1 << (bits * DIMENSION);
         distanceByteSize = calculateByteSize();
         if (maxDistance <= 0x100) {
-            bVals = new byte[(int)maxDistance][DIMENSION];
-            bDist = new byte[(int)maxDistance];
-            long[] c;
+            bVals = new byte[maxDistance][DIMENSION];
+            bDist = new byte[maxDistance];
+            int[] c;
             for (int i = 0; i < maxDistance; i++) {
                 c = HilbertUtility.distanceToPoint(bits, DIMENSION, i);
                 for (int j = 0; j < DIMENSION; j++) {
@@ -84,9 +84,9 @@ public class HilbertGeneralStrategy extends CurveStrategy {
             stored = true;
         }
         else if (maxDistance <= 0x10000) {
-            sVals = new short[(int)maxDistance][DIMENSION];
-            sDist = new short[(int)maxDistance];
-            long[] c;
+            sVals = new short[maxDistance][DIMENSION];
+            sDist = new short[maxDistance];
+            int[] c;
             for (int i = 0; i < maxDistance; i++) {
                 c = HilbertUtility.distanceToPoint(bits, DIMENSION, i);
                 for (int j = 0; j < DIMENSION; j++) {
@@ -97,13 +97,13 @@ public class HilbertGeneralStrategy extends CurveStrategy {
             stored = true;
         }
         else if (maxDistance <= 0x100000) {
-            iVals = new int[(int)maxDistance][DIMENSION];
-            iDist = new int[(int)maxDistance];
-            long[] c;
+            iVals = new int[maxDistance][DIMENSION];
+            iDist = new int[maxDistance];
+            int[] c;
             for (int i = 0; i < maxDistance; i++) {
                 c = HilbertUtility.distanceToPoint(bits, DIMENSION, i);
                 for (int j = 0; j < DIMENSION; j++) {
-                    iVals[i][j] = (int) c[j];
+                    iVals[i][j] =  c[j];
                 }
                 iDist[lookup(c)] = i;
             }
@@ -116,7 +116,7 @@ public class HilbertGeneralStrategy extends CurveStrategy {
         }
     }
 
-    private int lookup(long... point)
+    private int lookup(int... point)
     {
         int v = 0;
         for (int i = 0; i < DIMENSION; i++) {
@@ -124,25 +124,17 @@ public class HilbertGeneralStrategy extends CurveStrategy {
         }
         return v;
     }
-    private long[] toPoint(byte... coordinates)
+    private int[] toPoint(byte... coordinates)
     {
-        long[] pt = new long[coordinates.length];
+        int[] pt = new int[coordinates.length];
         for (int i = 0; i < coordinates.length; i++) {
             pt[i] = coordinates[i];
         }
         return pt;
     }
-    private long[] toPoint(short... coordinates)
+    private int[] toPoint(short... coordinates)
     {
-        long[] pt = new long[coordinates.length];
-        for (int i = 0; i < coordinates.length; i++) {
-            pt[i] = coordinates[i];
-        }
-        return pt;
-    }
-    private long[] toPoint(int... coordinates)
-    {
-        long[] pt = new long[coordinates.length];
+        int[] pt = new int[coordinates.length];
         for (int i = 0; i < coordinates.length; i++) {
             pt[i] = coordinates[i];
         }
@@ -150,16 +142,16 @@ public class HilbertGeneralStrategy extends CurveStrategy {
     }
 
     /**
-     * Given a distance to travel along this space-filling curve, gets the corresponding point as an array of long
-     * coordinates, typically in x, y, z... order. The length of the long array this returns is equivalent to the length
+     * Given a distance to travel along this space-filling curve, gets the corresponding point as an array of int
+     * coordinates, typically in x, y, z... order. The length of the int array this returns is equivalent to the length
      * of the dimensionality field, and no elements in the returned array should be equal to or greater than the
      * corresponding element of dimensionality.
      *
      * @param distance the distance to travel along the space-filling curve
-     * @return a long array, containing the x, y, z, etc. coordinates as elements to match the length of dimensionality
+     * @return a int array, containing the x, y, z, etc. coordinates as elements to match the length of dimensionality
      */
     @Override
-    public long[] point(long distance) {
+    public int[] point(int distance) {
         distance = (distance + maxDistance) % maxDistance;
         if(stored)
         {
@@ -173,7 +165,7 @@ public class HilbertGeneralStrategy extends CurveStrategy {
                 case 6:
                 case 7:
                 case 8:
-                    return toPoint(bVals[(int)distance]);
+                    return toPoint(bVals[distance]);
                 case 9:
                 case 10:
                 case 11:
@@ -182,12 +174,55 @@ public class HilbertGeneralStrategy extends CurveStrategy {
                 case 14:
                 case 15:
                 case 16:
-                    return toPoint(sVals[(int)distance]);
+                    return toPoint(sVals[distance]);
                 default:
-                    return toPoint(iVals[(int)distance]);
+                    return iVals[distance];
             }
         }
         return HilbertUtility.distanceToPoint(bits, DIMENSION, distance);
+    }
+
+    /**
+     * Given a distance to travel along this space-filling curve and an int array of coordinates to modify, changes the
+     * coordinates to match the point at the specified distance through this curve. The coordinates should typically be
+     * in x, y, z... order. The length of the coordinates array must be equivalent to the length of the dimensionality
+     * field, and no elements in the returned array will be equal to or greater than the corresponding element of
+     * dimensionality. Returns the modified coordinates as well as modifying them in-place.
+     *
+     * @param coordinates an array of int coordinates that will be modified to match the specified total distance
+     * @param distance    the distance (from the start) to travel along the space-filling curve
+     * @return the modified coordinates (modified in-place, not a copy)
+     */
+    @Override
+    public int[] alter(int[] coordinates, int distance) {
+        distance = (distance + maxDistance) % maxDistance;
+        if(stored)
+        {
+            switch (bits * DIMENSION)
+            {
+                case 1:
+                case 2:
+                case 3:
+                case 4:
+                case 5:
+                case 6:
+                case 7:
+                case 8:
+                    return Conversion.toIntsInPlace(coordinates, bVals[distance]);
+                case 9:
+                case 10:
+                case 11:
+                case 12:
+                case 13:
+                case 14:
+                case 15:
+                case 16:
+                    return Conversion.toIntsInPlace(coordinates, sVals[distance]);
+                default:
+                    return Conversion.toIntsInPlace(coordinates, iVals[distance]);
+            }
+        }
+        return HilbertUtility.distanceToPoint(coordinates, bits, DIMENSION, distance);
     }
 
     /**
@@ -200,7 +235,7 @@ public class HilbertGeneralStrategy extends CurveStrategy {
      * @return the appropriate dimension's coordinate for the point corresponding to distance traveled
      */
     @Override
-    public long coordinate(long distance, int dimension) {
+    public int coordinate(int distance, int dimension) {
         dimension %= DIMENSION;
         distance = (distance + maxDistance) % maxDistance;
         if(stored)
@@ -215,7 +250,7 @@ public class HilbertGeneralStrategy extends CurveStrategy {
                 case 6:
                 case 7:
                 case 8:
-                    return bVals[(int)distance][dimension];
+                    return bVals[distance][dimension];
                 case 9:
                 case 10:
                 case 11:
@@ -224,9 +259,9 @@ public class HilbertGeneralStrategy extends CurveStrategy {
                 case 14:
                 case 15:
                 case 16:
-                    return sVals[(int)distance][dimension];
+                    return sVals[distance][dimension];
                 default:
-                    return iVals[(int)distance][dimension];
+                    return iVals[distance][dimension];
             }
         }
         else
@@ -237,12 +272,12 @@ public class HilbertGeneralStrategy extends CurveStrategy {
      * Given an array or vararg of coordinates, which must have the same length as dimensionality, finds the distance
      * to travel along the space-filling curve to reach that distance.
      *
-     * @param coordinates an array or vararg of long coordinates; must match the length of dimensionality
-     * @return the distance to travel along the space-filling curve to reach the given coordinates, as a long, or -1 if
+     * @param coordinates an array or vararg of int coordinates; must match the length of dimensionality
+     * @return the distance to travel along the space-filling curve to reach the given coordinates, as a int, or -1 if
      * coordinates are invalid
      */
     @Override
-    public long distance(long... coordinates) {
+    public int distance(int... coordinates) {
         if(coordinates.length != DIMENSION)
             return -1;
         if(stored)

@@ -328,4 +328,50 @@ StringBuilder text = new StringBuilder(0xffff * 11);
         bb.asShortBuffer().put(arr);
         return bb;
     }
+    public static int boundedIndex(int[] bounds, int... point)
+    {
+        int u = 0;
+        for (int a = 0; a < bounds.length; a++) {
+            if(point[a] >= bounds[a])
+                return -1;
+            else
+            {
+                u *= bounds[a];
+                u += point[a];
+            }
+        }
+        return u;
+    }
+
+    public static int[] fromBounded(int[] bounds, int index)
+    {
+        int[] point = new int[bounds.length];
+        int u = 1;
+        for (int a = bounds.length - 1; a >= 0; a--) {
+            point[a] = (index / u) % bounds[a];
+            u *= bounds[a];
+        }
+        System.out.print(point[0]);
+
+        for (int a = 1; a < bounds.length; a++) {
+            System.out.print(", " + point[a]);
+        }
+        System.out.println();
+        return point;
+    }
+
+    //@Test
+    public void testBounds()
+    {
+        int[] bounds = new int[]{10, 20, 30};
+        System.out.println(boundedIndex(bounds, 0, 0, 0));
+        System.out.println(boundedIndex(bounds, 1, 2, 3));
+        System.out.println(boundedIndex(bounds, 5, 6, 7));
+        fromBounded(bounds, 0);
+        fromBounded(bounds, 663);
+        fromBounded(bounds, 3187);
+
+
+    }
+
 }

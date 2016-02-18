@@ -19,7 +19,7 @@ public class Hilbert2DStrategy extends CurveStrategy {
     /**
      * Side length of the square.
      */
-    private long side;
+    private int side;
     private static final int DIMENSION = 2;
 
     /**
@@ -30,10 +30,10 @@ public class Hilbert2DStrategy extends CurveStrategy {
     {
         this(256);
     }
-    public Hilbert2DStrategy(long sideLength) {
-        if(sideLength <= 0x8000000000000000L || sideLength > 0x80000000L)
+    public Hilbert2DStrategy(int sideLength) {
+        if(sideLength > 0x40000000)
         {
-            sideLength = 0x80000000L;
+            sideLength = 0x40000000;
         }
         else if(sideLength <= 1)
         {
@@ -41,47 +41,47 @@ public class Hilbert2DStrategy extends CurveStrategy {
         }
 
         side = HilbertUtility.nextPowerOfTwo(sideLength);
-        dimensionality = new long[]{side, side};
+        dimensionality = new int[]{side, side};
         maxDistance = side * side;
         distanceByteSize = calculateByteSize();
         bits = Long.numberOfTrailingZeros(side);
         //int xCoord = bits % 2 == 0 ? 0 : 1, yCoord = bits % 2 == 1 ? 0 : 1;
         if (maxDistance <= 0x100) {
-            bX = new byte[(int)maxDistance];
-            bY = new byte[(int)maxDistance];
-            bDist = new byte[(int)maxDistance];
-            long[] c;
+            bX = new byte[maxDistance];
+            bY = new byte[maxDistance];
+            bDist = new byte[maxDistance];
+            int[] c;
             for (int i = 0; i < maxDistance; i++) {
                 c = distanceToPointSmall(i);
                 bX[i] = (byte) c[0];
                 bY[i] = (byte) c[1];
-                bDist[(int)c[0] + (((int)c[1]) << bits)] = (byte) i;
+                bDist[c[0] + ((c[1]) << bits)] = (byte) i;
             }
             stored = true;
         }
         else if (maxDistance <= 0x10000) {
-            sX = new short[(int)maxDistance];
-            sY = new short[(int)maxDistance];
-            sDist = new short[(int)maxDistance];
-            long[] c;
+            sX = new short[maxDistance];
+            sY = new short[maxDistance];
+            sDist = new short[maxDistance];
+            int[] c;
             for (int i = 0; i < maxDistance; i++) {
                 c = distanceToPointSmall(i);
                 sX[i] = (short) c[0];
                 sY[i] = (short) c[1];
-                sDist[(int)c[0] + (((int)c[1]) << bits)] = (short) i;
+                sDist[c[0] + ((c[1]) << bits)] = (short) i;
             }
             stored = true;
         }
         else if (maxDistance <= 0x100000) {
-            iX = new int[(int)maxDistance];
-            iY = new int[(int)maxDistance];
-            iDist = new int[(int)maxDistance];
-            long[] c;
+            iX = new int[maxDistance];
+            iY = new int[maxDistance];
+            iDist = new int[maxDistance];
+            int[] c;
             for (int i = 0; i < maxDistance; i++) {
                 c = HilbertUtility.distanceToPoint(bits, DIMENSION, i);
-                iX[i] = (int) c[0];
-                iY[i] = (int) c[1];
-                iDist[(int)c[0] + (((int)c[1]) << bits)] = i;
+                iX[i] =  c[0];
+                iY[i] =  c[1];
+                iDist[c[0] + ((c[1]) << bits)] = i;
             }
             stored = true;
         }
@@ -92,16 +92,16 @@ public class Hilbert2DStrategy extends CurveStrategy {
     }
 
     /**
-     * Given a distance to travel along this space-filling curve, gets the corresponding point as an array of long
-     * coordinates, typically in x, y, z... order. The length of the long array this returns is equivalent to the length
+     * Given a distance to travel along this space-filling curve, gets the corresponding point as an array of int
+     * coordinates, typically in x, y, z... order. The length of the int array this returns is equivalent to the length
      * of the dimensionality field, and no elements in the returned array should be equal to or greater than the
      * corresponding element of dimensionality.
      *
      * @param distance the distance to travel along the space-filling curve
-     * @return a long array, containing the x, y, z, etc. coordinates as elements to match the length of dimensionality
+     * @return a int array, containing the x, y, z, etc. coordinates as elements to match the length of dimensionality
      */
     @Override
-    public long[] point(long distance) {
+    public int[] point(int distance) {
         distance = (distance + maxDistance) % maxDistance;
         if(stored)
         {
@@ -111,17 +111,58 @@ public class Hilbert2DStrategy extends CurveStrategy {
                 case 2:
                 case 3:
                 case 4:
-                    return new long[]{bX[(int)distance], bY[(int)distance]};
+                    return new int[]{bX[distance], bY[distance]};
                 case 5:
                 case 6:
                 case 7:
                 case 8:
-                    return new long[]{sX[(int)distance], sY[(int)distance]};
+                    return new int[]{sX[distance], sY[distance]};
                 default:
-                    return new long[]{iX[(int)distance], iY[(int)distance]};
+                    return new int[]{iX[distance], iY[distance]};
             }
         }
         return HilbertUtility.distanceToPoint(bits, DIMENSION, distance);
+    }
+
+    /**
+     * Given a distance to travel along this space-filling curve and an int array of coordinates to modify, changes the
+     * coordinates to match the point at the specified distance through this curve. The coordinates should typically be
+     * in x, y, z... order. The length of the coordinates array must be equivalent to the length of the dimensionality
+     * field, and no elements in the returned array will be equal to or greater than the corresponding element of
+     * dimensionality. Returns the modified coordinates as well as modifying them in-place.
+     *
+     * @param coordinates an array of int coordinates that will be modified to match the specified total distance
+     * @param distance    the distance (from the start) to travel along the space-filling curve
+     * @return the modified coordinates (modified in-place, not a copy)
+     */
+    @Override
+    public int[] alter(int[] coordinates, int distance) {
+        distance = (distance + maxDistance) % maxDistance;
+        if(stored)
+        {
+            switch (bits)
+            {
+                case 1:
+                case 2:
+                case 3:
+                case 4:
+                    coordinates[0] = bX[distance];
+                    coordinates[1] = bY[distance];
+                    return coordinates;
+                case 5:
+                case 6:
+                case 7:
+                case 8:
+                    coordinates[0] = sX[distance];
+                    coordinates[1] = sY[distance];
+                    return coordinates;
+                default:
+                    coordinates[0] = iX[distance];
+                    coordinates[1] = iY[distance];
+                    return coordinates;
+            }
+        }
+        return HilbertUtility.distanceToPoint(coordinates, bits, DIMENSION, distance);
     }
 
     /**
@@ -134,7 +175,7 @@ public class Hilbert2DStrategy extends CurveStrategy {
      * @return the appropriate dimension's coordinate for the point corresponding to distance traveled
      */
     @Override
-    public long coordinate(long distance, int dimension) {
+    public int coordinate(int distance, int dimension) {
         dimension %= 2;
         distance = (distance + maxDistance) % maxDistance;
         if(stored)
@@ -146,22 +187,22 @@ public class Hilbert2DStrategy extends CurveStrategy {
                 case 3:
                 case 4:
                     if(dimension == 0)
-                        return bX[(int)distance];
+                        return bX[distance];
                     else
-                        return bY[(int)distance];
+                        return bY[distance];
                 case 5:
                 case 6:
                 case 7:
                 case 8:
                     if(dimension == 0)
-                        return sX[(int)distance];
+                        return sX[distance];
                     else
-                        return sY[(int)distance];
+                        return sY[distance];
                 default:
                     if(dimension == 0)
-                        return iX[(int)distance];
+                        return iX[distance];
                     else
-                        return iY[(int)distance];
+                        return iY[distance];
             }
         }
         else
@@ -172,12 +213,12 @@ public class Hilbert2DStrategy extends CurveStrategy {
      * Given an array or vararg of coordinates, which must have the same length as dimensionality, finds the distance
      * to travel along the space-filling curve to reach that distance.
      *
-     * @param coordinates an array or vararg of long coordinates; must match the length of dimensionality
-     * @return the distance to travel along the space-filling curve to reach the given coordinates, as a long, or -1 if
+     * @param coordinates an array or vararg of int coordinates; must match the length of dimensionality
+     * @return the distance to travel along the space-filling curve to reach the given coordinates, as a int, or -1 if
      * coordinates are invalid
      */
     @Override
-    public long distance(long... coordinates) {
+    public int distance(int... coordinates) {
         if(coordinates.length != 2)
             return -1;
         if(stored)
@@ -188,14 +229,14 @@ public class Hilbert2DStrategy extends CurveStrategy {
                 case 2:
                 case 3:
                 case 4:
-                    return bDist[(int)coordinates[0] + ((int)coordinates[1] << bits)];
+                    return bDist[coordinates[0] + (coordinates[1] << bits)];
                 case 5:
                 case 6:
                 case 7:
                 case 8:
-                    return sDist[(int)coordinates[0] + ((int)coordinates[1] << bits)];
+                    return sDist[coordinates[0] + (coordinates[1] << bits)];
                 default:
-                    return iDist[(int)coordinates[0] + ((int)coordinates[1] << bits)];
+                    return iDist[coordinates[0] + (coordinates[1] << bits)];
             }
         }
         return pointToDistanceClosedForm(coordinates[0], coordinates[1]);
@@ -203,28 +244,28 @@ public class Hilbert2DStrategy extends CurveStrategy {
     }
 
     /**
-     * Takes a distance to travel along the 2D Hilbert curve and returns a long array representing the position in 2D
+     * Takes a distance to travel along the 2D Hilbert curve and returns a int array representing the position in 2D
      * space that corresponds to that point on the Hilbert curve. This variant does not use a lookup table.
      * <br>
      * Source: http://and-what-happened.blogspot.com/2011/08/fast-2d-and-3d-hilbert-curves-and.html
-     * @param hilbert a long distance
-     * @return a long array of coordinates representing a point
+     * @param hilbert a int distance
+     * @return a int array of coordinates representing a point
      */
-    private long[] distanceToPointSmall( final long hilbert )
+    private int[] distanceToPointSmall( final int hilbert )
     {
-        long x = 0, y = 0;
+        int x = 0, y = 0;
         int remap = 0xb4;
         int block = bits << 1;
         while( block > 0 )
         {
             block -= 2;
-            long hcode = ( ( hilbert >>> block ) & 3 );
-            long mcode = ( ( remap >>> ( hcode << 1 ) ) & 3 );
+            int hcode = ( ( hilbert >>> block ) & 3 );
+            int mcode = ( ( remap >>> ( hcode << 1 ) ) & 3 );
             remap ^= ( 0x330000cc >>> ( hcode << 3 ) );
             x = (x << 1) + (mcode & 1);
             y = (y << 1) + ((mcode & 2) >> 1);
         }
-        return new long[]{x, y};
+        return new int[]{x, y};
     }
 
     /**
@@ -238,15 +279,15 @@ public class Hilbert2DStrategy extends CurveStrategy {
      * @param y y coordinate
      * @return corresponding distance
      */
-    private long pointToDistanceClosedForm(long x, long y)
+    private int pointToDistanceClosedForm(int x, int y)
     {
-        long h = 0;
-        long pos = side >>> 1;
-        long mask = side-1;
-        long tmp;
-        for (long i=0; i<bits; i++) {
-            long xi = (x & pos) >>> (bits-i-1);
-            long yi = (y & pos) >>> (bits-i-1);
+        int h = 0;
+        int pos = side >>> 1;
+        int mask = side-1;
+        int tmp;
+        for (int i=0; i<bits; i++) {
+            int xi = (x & pos) >>> (bits-i-1);
+            int yi = (y & pos) >>> (bits-i-1);
             x = x & mask; y = y & mask;
             if (xi==0 && yi==0) { // Case 1
                 tmp = x; x = y; y = tmp;

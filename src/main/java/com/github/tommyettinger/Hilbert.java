@@ -12,7 +12,7 @@ public class Hilbert {
      * @param n any int
      * @return the gray code for n
      */
-    public static long grayEncode(long n){
+    public static int grayEncode(int n){
         return n ^ (n >> 1);
     }
 
@@ -22,8 +22,8 @@ public class Hilbert {
      * @param n a gray code, as produced by grayEncode
      * @return the decoded int
      */
-    public static long grayDecode(long n) {
-        long p = n;
+    public static int grayDecode(int n) {
+        int p = n;
         while ((n >>= 1) != 0)
             p ^= n;
         return p;
@@ -36,9 +36,9 @@ public class Hilbert {
      * @param x
      * @return
      */
-    public static long transform(long entry, int direction, long x)
+    public static int transform(int entry, int direction, int x)
     {
-        return Long.rotateRight(x ^ entry, direction + 1);
+        return Integer.rotateRight(x ^ entry, direction + 1);
     }
 
     /**
@@ -48,9 +48,9 @@ public class Hilbert {
      * @param x
      * @return
      */
-    public static long transformInverse(long entry, int direction, long x)
+    public static int transformInverse(int entry, int direction, int x)
     {
-        return Long.rotateLeft(x, direction + 1) ^ entry;
+        return Integer.rotateLeft(x, direction + 1) ^ entry;
     }
 
     /**
@@ -59,11 +59,11 @@ public class Hilbert {
      * @param n
      * @return
      */
-    public static int direction(long x, int n)
+    public static int direction(int x, int n)
     {
         if(x <= 0)
             return 0;
-        return Long.numberOfTrailingZeros(~((x-1)|1)) % n;
+        return Integer.numberOfTrailingZeros(~((x-1)|1)) % n;
     }
 
     /**
@@ -71,7 +71,7 @@ public class Hilbert {
      * @param x
      * @return
      */
-    public static long entry(long x)
+    public static int entry(int x)
     {
         if(x <= 0)
             return 0;

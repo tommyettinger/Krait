@@ -9,7 +9,7 @@ import static org.junit.Assert.assertEquals;
  */
 public class CurveStrategyTest {
 
-    public static void printPoint(long... coordinates)
+    public static void printPoint(int... coordinates)
     {
         if(coordinates == null || coordinates.length == 0)
             return;
@@ -19,7 +19,7 @@ public class CurveStrategyTest {
         }
         System.out.print("]");
     }
-    public static void printlnPoint(long... coordinates)
+    public static void printlnPoint(int... coordinates)
     {
         if(coordinates == null || coordinates.length == 0)
             return;
@@ -29,7 +29,7 @@ public class CurveStrategyTest {
         }
         System.out.println("]");
     }
-    public static void printlnPoint(String name, long... coordinates)
+    public static void printlnPoint(String name, int... coordinates)
     {
         System.out.print(name + ": ");
         if(coordinates == null || coordinates.length == 0)
@@ -46,7 +46,7 @@ public class CurveStrategyTest {
         System.out.println("Hilbert Curve 2D");
         Hilbert2DStrategy hilbert = new Hilbert2DStrategy(123);
         System.out.println("Max distance: " + Long.toHexString(hilbert.maxDistance));
-        long[] pt = hilbert.point(0);
+        int[] pt = hilbert.point(0);
         printlnPoint("Hilbert Order 7 position 0", pt);
         pt = hilbert.point(1);
         printlnPoint("Hilbert Order 7 position 1", pt);
@@ -100,7 +100,7 @@ public class CurveStrategyTest {
         //System.out.println("Hilbert Curve 2D");
         Hilbert2DStrategy hilbert = new Hilbert2DStrategy(123);
         //System.out.println("Max distance: " + Long.toHexString(hilbert.maxDistance));
-        long[] pt = hilbert.point(0);
+        int[] pt = hilbert.point(0);
         //printlnPoint("Hilbert Order 7 position 0", pt);
         pt = hilbert.point(1);
         //printlnPoint("Hilbert Order 7 position 1", pt);
@@ -109,7 +109,7 @@ public class CurveStrategyTest {
         pt = hilbert.point(-1);
         //printlnPoint("Hilbert Order 7 position end", pt);
 
-        for (long i = 0; i < hilbert.maxDistance; i++) {
+        for (int i = 0; i < hilbert.maxDistance; i++) {
             pt = hilbert.point(i);
             l ^= pt[0] ^ pt[1];
         }
@@ -125,7 +125,7 @@ public class CurveStrategyTest {
         pt = hilbert.point(-1);
         //printlnPoint("Hilbert Order 8 position end", pt);
 
-        for (long i = 0; i < hilbert.maxDistance; i++) {
+        for (int i = 0; i < hilbert.maxDistance; i++) {
             pt = hilbert.point(i);
             l ^= pt[0] ^ pt[1];
         }
@@ -141,7 +141,7 @@ public class CurveStrategyTest {
         pt = hilbert.point(-1);
         //printlnPoint("Hilbert Order 10 position end", pt);
 
-        for (long i = 0; i < hilbert.maxDistance; i++) {
+        for (int i = 0; i < hilbert.maxDistance; i++) {
             pt = hilbert.point(i);
             l ^= pt[0] ^ pt[1];
         }
@@ -154,7 +154,7 @@ public class CurveStrategyTest {
         System.out.println("Hilbert Curve 3D");
         HilbertGeneralStrategy hilbert = new HilbertGeneralStrategy(3, 30);
         System.out.println("Max distance: " + Long.toHexString(hilbert.maxDistance));
-        long[] pt = hilbert.point(0);
+        int[] pt = hilbert.point(0);
         printlnPoint("Hilbert Order 5 position 0", pt);
         pt = hilbert.point(1);
         printlnPoint("Hilbert Order 5 position 1", pt);
@@ -181,7 +181,7 @@ public class CurveStrategyTest {
         System.out.println("Hilbert Curve 4D");
         HilbertGeneralStrategy hilbert = new HilbertGeneralStrategy(4, 30);
         System.out.println("Max distance: " + Long.toHexString(hilbert.maxDistance));
-        long[] pt = hilbert.point(0);
+        int[] pt = hilbert.point(0);
         printlnPoint("Hilbert Order 5 position 0", pt);
         pt = hilbert.point(1);
         printlnPoint("Hilbert Order 5 position 1", pt);
@@ -207,7 +207,7 @@ public class CurveStrategyTest {
         System.out.println("Moore Curve 3D");
         MooreGeneralStrategy moore = new MooreGeneralStrategy(3, 3, 1, 3);
         System.out.println("Max distance: 0x" + Long.toHexString(moore.maxDistance));
-        long[] pt = moore.point(0), pt2;
+        int[] pt = moore.point(0), pt2;
         printlnPoint("Moore position 0", pt);
         pt = moore.point(1);
         printlnPoint("Moore position 1", pt);
@@ -241,7 +241,7 @@ public class CurveStrategyTest {
         System.out.println("Puka Curve");
         PukaStrategy puka = new PukaStrategy();
         System.out.println("Max distance: " + Long.toHexString(puka.maxDistance));
-        long[] pt = puka.point(0), pt2;
+        int[] pt = puka.point(0), pt2;
         printlnPoint("Puka position 0", pt);
         pt = puka.point(1);
         printlnPoint("Puka position 1", pt);
@@ -264,7 +264,7 @@ public class CurveStrategyTest {
         System.out.println("Puka-Hilbert Curve");
         PukaHilbertStrategy ph = new PukaHilbertStrategy();
         System.out.println("Max distance: " + Long.toHexString(ph.maxDistance));
-        long[] pt = ph.point(0), pt2;
+        int[] pt = ph.point(0), pt2;
         printlnPoint("Puka-Hilbert position 0", pt);
         pt = ph.point(1);
         printlnPoint("Puka-Hilbert position 1", pt);

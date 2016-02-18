@@ -30,7 +30,7 @@ public class PukaHilbertStrategy extends CurveStrategy {
     /**
      * Side length of the cube.
      */
-    private static final long side = 40;
+    private static final int side = 40;
     private static final int DIMENSION = 3;
     private final HilbertGeneralStrategy hilbert;
     private final PukaStrategy puka;
@@ -41,17 +41,17 @@ public class PukaHilbertStrategy extends CurveStrategy {
      */
     public PukaHilbertStrategy() {
 
-        dimensionality = new long[]{side, side, side};
+        dimensionality = new int[]{side, side, side};
         maxDistance = 64000;
         distanceByteSize = 2;
         hilbert = new HilbertGeneralStrategy(3, 16);
         puka = new PukaStrategy();
-        long[] start, end;
+        int[] start, end;
         for (int h = 0, p = 0; h < 0x1000; h += 8, p += 125) {
             start = hilbert.point(h);
             end = hilbert.point(h + 7);
-            int startX = (int)start[0], startY = (int)start[1], startZ = (int)start[2],
-                    endX = (int)end[0], endY = (int)end[1], endZ = (int)end[2],
+            int startX = start[0], startY = start[1], startZ = start[2],
+                    endX = end[0], endY = end[1], endZ = end[2],
                     bottomX = startX >> 1, bottomY = startY >> 1, bottomZ = startZ >> 1;
             int direction, rotation;
             if(startX < endX) {
@@ -91,18 +91,38 @@ public class PukaHilbertStrategy extends CurveStrategy {
     }
 
     /**
-     * Given a distance to travel along this space-filling curve, gets the corresponding point as an array of long
-     * coordinates, typically in x, y, z... order. The length of the long array this returns is equivalent to the length
+     * Given a distance to travel along this space-filling curve, gets the corresponding point as an array of int
+     * coordinates, typically in x, y, z... order. The length of the int array this returns is equivalent to the length
      * of the dimensionality field, and no elements in the returned array should be equal to or greater than the
      * corresponding element of dimensionality.
      *
      * @param distance the distance to travel along the space-filling curve
-     * @return a long array, containing the x, y, z, etc. coordinates as elements to match the length of dimensionality
+     * @return a int array, containing the x, y, z, etc. coordinates as elements to match the length of dimensionality
      */
     @Override
-    public long[] point(long distance) {
+    public int[] point(int distance) {
         distance = (distance + maxDistance) % maxDistance;
-        return new long[]{pukaHilbertX[(int)distance], pukaHilbertY[(int)distance], pukaHilbertZ[(int)distance]};
+        return new int[]{pukaHilbertX[distance], pukaHilbertY[distance], pukaHilbertZ[distance]};
+    }
+
+    /**
+     * Given a distance to travel along this space-filling curve and an int array of coordinates to modify, changes the
+     * coordinates to match the point at the specified distance through this curve. The coordinates should typically be
+     * in x, y, z... order. The length of the coordinates array must be equivalent to the length of the dimensionality
+     * field, and no elements in the returned array will be equal to or greater than the corresponding element of
+     * dimensionality. Returns the modified coordinates as well as modifying them in-place.
+     *
+     * @param coordinates an array of int coordinates that will be modified to match the specified total distance
+     * @param distance    the distance (from the start) to travel along the space-filling curve
+     * @return the modified coordinates (modified in-place, not a copy)
+     */
+    @Override
+    public int[] alter(int[] coordinates, int distance) {
+        distance = (distance + maxDistance) % maxDistance;
+        coordinates[0] = pukaHilbertX[distance];
+        coordinates[1] = pukaHilbertY[distance];
+        coordinates[2] = pukaHilbertZ[distance];
+        return coordinates;
     }
 
     /**
@@ -115,17 +135,17 @@ public class PukaHilbertStrategy extends CurveStrategy {
      * @return the appropriate dimension's coordinate for the point corresponding to distance traveled
      */
     @Override
-    public long coordinate(long distance, int dimension) {
+    public int coordinate(int distance, int dimension) {
         dimension %= 3;
         distance = (distance + maxDistance) % maxDistance;
 
         switch (dimension) {
             case 0:
-                return pukaHilbertX[(int)distance];
+                return pukaHilbertX[distance];
             case 1:
-                return pukaHilbertY[(int)distance];
+                return pukaHilbertY[distance];
             default:
-                return pukaHilbertZ[(int)distance];
+                return pukaHilbertZ[distance];
         }
     }
 
@@ -133,14 +153,14 @@ public class PukaHilbertStrategy extends CurveStrategy {
      * Given an array or vararg of coordinates, which must have the same length as dimensionality, finds the distance
      * to travel along the space-filling curve to reach that distance.
      *
-     * @param coordinates an array or vararg of long coordinates; must match the length of dimensionality
-     * @return the distance to travel along the space-filling curve to reach the given coordinates, as a long, or -1 if
+     * @param coordinates an array or vararg of int coordinates; must match the length of dimensionality
+     * @return the distance to travel along the space-filling curve to reach the given coordinates, as a int, or -1 if
      * coordinates are invalid
      */
     @Override
-    public long distance(long... coordinates) {
+    public int distance(int... coordinates) {
         if(coordinates.length != 3)
             return -1;
-        return pukaHilbertDist[(int) coordinates[0] + 40 * (int)coordinates[1] + 1600 * (int)coordinates[2]];
+        return pukaHilbertDist[ coordinates[0] + 40 * coordinates[1] + 1600 * coordinates[2]];
     }
 }

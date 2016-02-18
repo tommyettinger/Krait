@@ -110,4 +110,32 @@ public class Conversion {
         }
         return out;
     }
+
+
+    public static int[] toIntsInPlace(int[] receiving, byte[] values)
+    {
+        for (int i = 0; i < values.length; i++) {
+            receiving[i] = (MASK16 & values[i]);
+        }
+        return receiving;
+    }
+    public static int[] toIntsInPlace(int[] receiving, short[] values)
+    {
+        for (int i = 0; i < values.length; i++) {
+            receiving[i] = (MASK16 & values[i]);
+        }
+        return receiving;
+    }
+    public static int[] toIntsInPlace(int[] receiving, int[] values)
+    {
+        System.arraycopy(values, 0, receiving, 0, values.length);
+        return receiving;
+    }
+    public static int[] toIntsInPlace(int[] receiving, long[] values)
+    {
+        for (int i = 0; i < values.length; i++) {
+            receiving[i] = (int)values[i];
+        }
+        return receiving;
+    }
 }

@@ -40,7 +40,7 @@ public class PukaStrategy extends CurveStrategy {
     /**
      * Side length of the cube.
      */
-    private static final long side = 5;
+    private static final int side = 5;
     private static final int DIMENSION = 3;
 
     /**
@@ -49,7 +49,7 @@ public class PukaStrategy extends CurveStrategy {
      */
     public PukaStrategy() {
 
-        dimensionality = new long[]{side, side, side};
+        dimensionality = new int[]{side, side, side};
         maxDistance = 125;
         distanceByteSize = 1;
 
@@ -87,18 +87,38 @@ public class PukaStrategy extends CurveStrategy {
     }
 
     /**
-     * Given a distance to travel along this space-filling curve, gets the corresponding point as an array of long
-     * coordinates, typically in x, y, z... order. The length of the long array this returns is equivalent to the length
+     * Given a distance to travel along this space-filling curve, gets the corresponding point as an array of int
+     * coordinates, typically in x, y, z... order. The length of the int array this returns is equivalent to the length
      * of the dimensionality field, and no elements in the returned array should be equal to or greater than the
      * corresponding element of dimensionality.
      *
      * @param distance the distance to travel along the space-filling curve
-     * @return a long array, containing the x, y, z, etc. coordinates as elements to match the length of dimensionality
+     * @return a int array, containing the x, y, z, etc. coordinates as elements to match the length of dimensionality
      */
     @Override
-    public long[] point(long distance) {
+    public int[] point(int distance) {
         distance = (distance + maxDistance) % maxDistance;
-        return new long[]{pukaX[(int)distance], pukaY[(int)distance], pukaZ[(int)distance]};
+        return new int[]{pukaX[distance], pukaY[distance], pukaZ[distance]};
+    }
+
+    /**
+     * Given a distance to travel along this space-filling curve and an int array of coordinates to modify, changes the
+     * coordinates to match the point at the specified distance through this curve. The coordinates should typically be
+     * in x, y, z... order. The length of the coordinates array must be equivalent to the length of the dimensionality
+     * field, and no elements in the returned array will be equal to or greater than the corresponding element of
+     * dimensionality. Returns the modified coordinates as well as modifying them in-place.
+     *
+     * @param coordinates an array of int coordinates that will be modified to match the specified total distance
+     * @param distance    the distance (from the start) to travel along the space-filling curve
+     * @return the modified coordinates (modified in-place, not a copy)
+     */
+    @Override
+    public int[] alter(int[] coordinates, int distance) {
+        distance = (distance + maxDistance) % maxDistance;
+        coordinates[0] = pukaX[distance];
+        coordinates[1] = pukaY[distance];
+        coordinates[2] = pukaZ[distance];
+        return coordinates;
     }
 
     /**
@@ -111,17 +131,17 @@ public class PukaStrategy extends CurveStrategy {
      * @return the appropriate dimension's coordinate for the point corresponding to distance traveled
      */
     @Override
-    public long coordinate(long distance, int dimension) {
+    public int coordinate(int distance, int dimension) {
         dimension %= 3;
         distance = (distance + maxDistance) % maxDistance;
 
         switch (dimension) {
             case 0:
-                return pukaX[(int)distance];
+                return pukaX[distance];
             case 1:
-                return pukaY[(int)distance];
+                return pukaY[distance];
             default:
-                return pukaZ[(int)distance];
+                return pukaZ[distance];
         }
     }
 
@@ -129,15 +149,15 @@ public class PukaStrategy extends CurveStrategy {
      * Given an array or vararg of coordinates, which must have the same length as dimensionality, finds the distance
      * to travel along the space-filling curve to reach that distance.
      *
-     * @param coordinates an array or vararg of long coordinates; must match the length of dimensionality
-     * @return the distance to travel along the space-filling curve to reach the given coordinates, as a long, or -1 if
+     * @param coordinates an array or vararg of int coordinates; must match the length of dimensionality
+     * @return the distance to travel along the space-filling curve to reach the given coordinates, as a int, or -1 if
      * coordinates are invalid
      */
     @Override
-    public long distance(long... coordinates) {
+    public int distance(int... coordinates) {
         if(coordinates.length != 3)
             return -1;
-        return pukaDist[(int) coordinates[0] + 5 * (int)coordinates[1] + 25 * (int)coordinates[2]];
+        return pukaDist[ coordinates[0] + 5 * coordinates[1] + 25 * coordinates[2]];
     }
 
     /**
@@ -146,62 +166,62 @@ public class PukaStrategy extends CurveStrategy {
      * @param distance the distance to travel along the space-filling curve
      * @param direction between 0 and 5, inclusive
      * @param rotation between 0 and 3, inclusive
-     * @return a long array, containing the x, y, z, etc. coordinates as elements to match the length of dimensionality
+     * @return a int array, containing the x, y, z, etc. coordinates as elements to match the length of dimensionality
      */
-    public long[] pointRotated(int distance, int direction, int rotation) {
-        distance = (int)((distance + maxDistance) % maxDistance);
+    public int[] pointRotated(int distance, int direction, int rotation) {
+        distance = (distance + maxDistance) % maxDistance;
         switch (4 * direction + rotation)
         {
             case 0:
-                return new long[]{pukaZ[distance], pukaX[distance], pukaY[distance]};
+                return new int[]{pukaZ[distance], pukaX[distance], pukaY[distance]};
             case 1:
-                return new long[]{pukaZ[distance], 4 - pukaY[distance], pukaX[distance]};
+                return new int[]{pukaZ[distance], 4 - pukaY[distance], pukaX[distance]};
             case 2:
-                return new long[]{pukaZ[distance], 4 - pukaX[distance], 4 - pukaY[distance]};
+                return new int[]{pukaZ[distance], 4 - pukaX[distance], 4 - pukaY[distance]};
             case 3:
-                return new long[]{pukaZ[distance], pukaY[distance], 4 - pukaX[distance]};
+                return new int[]{pukaZ[distance], pukaY[distance], 4 - pukaX[distance]};
             case 4:
-                return new long[]{pukaX[distance], pukaZ[distance], pukaY[distance]};
+                return new int[]{pukaX[distance], pukaZ[distance], pukaY[distance]};
             case 5:
-                return new long[]{4 - pukaY[distance], pukaZ[distance], pukaX[distance]};
+                return new int[]{4 - pukaY[distance], pukaZ[distance], pukaX[distance]};
             case 6:
-                return new long[]{4 - pukaX[distance], pukaZ[distance], 4 - pukaY[distance]};
+                return new int[]{4 - pukaX[distance], pukaZ[distance], 4 - pukaY[distance]};
             case 7:
-                return new long[]{pukaY[distance], pukaZ[distance], 4 - pukaX[distance]};
+                return new int[]{pukaY[distance], pukaZ[distance], 4 - pukaX[distance]};
             case 8:
-                return new long[]{pukaX[distance], pukaY[distance], pukaZ[distance]};
+                return new int[]{pukaX[distance], pukaY[distance], pukaZ[distance]};
             case 9:
-                return new long[]{4 - pukaY[distance], pukaX[distance], pukaZ[distance]};
+                return new int[]{4 - pukaY[distance], pukaX[distance], pukaZ[distance]};
             case 10:
-                return new long[]{4 - pukaX[distance], 4 - pukaY[distance], pukaZ[distance]};
+                return new int[]{4 - pukaX[distance], 4 - pukaY[distance], pukaZ[distance]};
             case 11:
-                return new long[]{pukaY[distance], 4 - pukaX[distance], pukaZ[distance]};
+                return new int[]{pukaY[distance], 4 - pukaX[distance], pukaZ[distance]};
 
 
             case 12:
-                return new long[]{4 - pukaZ[distance], pukaX[distance], pukaY[distance]};
+                return new int[]{4 - pukaZ[distance], pukaX[distance], pukaY[distance]};
             case 13:
-                return new long[]{4 - pukaZ[distance], 4 - pukaY[distance], pukaX[distance]};
+                return new int[]{4 - pukaZ[distance], 4 - pukaY[distance], pukaX[distance]};
             case 14:
-                return new long[]{4 - pukaZ[distance], 4 - pukaX[distance], 4 - pukaY[distance]};
+                return new int[]{4 - pukaZ[distance], 4 - pukaX[distance], 4 - pukaY[distance]};
             case 15:
-                return new long[]{4 - pukaZ[distance], pukaY[distance], 4 - pukaX[distance]};
+                return new int[]{4 - pukaZ[distance], pukaY[distance], 4 - pukaX[distance]};
             case 16:
-                return new long[]{pukaX[distance], 4 - pukaZ[distance], pukaY[distance]};
+                return new int[]{pukaX[distance], 4 - pukaZ[distance], pukaY[distance]};
             case 17:
-                return new long[]{4 - pukaY[distance], 4 - pukaZ[distance], pukaX[distance]};
+                return new int[]{4 - pukaY[distance], 4 - pukaZ[distance], pukaX[distance]};
             case 18:
-                return new long[]{4 - pukaX[distance], 4 - pukaZ[distance], 4 - pukaY[distance]};
+                return new int[]{4 - pukaX[distance], 4 - pukaZ[distance], 4 - pukaY[distance]};
             case 19:
-                return new long[]{pukaY[distance], 4 - pukaZ[distance], 4 - pukaX[distance]};
+                return new int[]{pukaY[distance], 4 - pukaZ[distance], 4 - pukaX[distance]};
             case 20:
-                return new long[]{pukaX[distance], pukaY[distance], 4 - pukaZ[distance]};
+                return new int[]{pukaX[distance], pukaY[distance], 4 - pukaZ[distance]};
             case 21:
-                return new long[]{4 - pukaY[distance], pukaX[distance], 4 - pukaZ[distance]};
+                return new int[]{4 - pukaY[distance], pukaX[distance], 4 - pukaZ[distance]};
             case 22:
-                return new long[]{4 - pukaX[distance], 4 - pukaY[distance], 4 - pukaZ[distance]};
+                return new int[]{4 - pukaX[distance], 4 - pukaY[distance], 4 - pukaZ[distance]};
             default:
-                return new long[]{pukaY[distance], 4 - pukaX[distance], 4 - pukaZ[distance]};
+                return new int[]{pukaY[distance], 4 - pukaX[distance], 4 - pukaZ[distance]};
 
         }
     }
@@ -214,8 +234,8 @@ public class PukaStrategy extends CurveStrategy {
      * @param rotation between 0 and 3, inclusive
      * @return the appropriate dimension's rotated coordinate for the point corresponding to distance traveled
      */
-    public long coordinateRotated(int distance, int dimension, int direction, int rotation) {
-        distance = (int)((distance + maxDistance) % maxDistance);
+    public int coordinateRotated(int distance, int dimension, int direction, int rotation) {
+        distance = (distance + maxDistance) % maxDistance;
         switch (dimension) {
             case 0:
                 switch (4 * direction + rotation) {

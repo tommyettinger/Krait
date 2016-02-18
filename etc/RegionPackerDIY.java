@@ -1,7 +1,8 @@
 package com.github.tommyettinger;
 
-import com.googlecode.javaewah.IntIterator;
-import com.googlecode.javaewah32.EWAHCompressedBitmap32;
+import com.gs.collections.api.block.procedure.primitive.IntIntProcedure;
+import com.gs.collections.api.iterator.IntIterator;
+import com.gs.collections.impl.list.mutable.primitive.IntArrayList;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -118,30 +119,26 @@ import java.util.Arrays;
  * Created by Tommy Ettinger on 10/1/2015.
  * @author Tommy Ettinger
  */
-public class RegionPacker {
+public class RegionPackerDIY {
 
-    public final EWAHCompressedBitmap32 ALL_WALL,
-            ALL_ON;
+    public static final Region ALL_WALL = new Region(0), ALL_ON = new Region(0, -1);
     public CurveStrategy curve;
-    public RegionPacker()
+    public RegionPackerDIY()
     {
         this(new Hilbert2DStrategy(256));
     }
-    public RegionPacker(CurveStrategy curveStrategy)
+    public RegionPackerDIY(CurveStrategy curveStrategy)
     {
         curve = curveStrategy;
-        ALL_WALL = new EWAHCompressedBitmap32(1);
-        ALL_ON = new EWAHCompressedBitmap32();
-        ALL_ON.not();
     }
 
     /**
-     * Given a point as an array or vararg of int coordinates and the bounds as an array of int dimension lengths,
+     * Given a point as an array or vararg of long coordinates and the bounds as an array of long dimension lengths,
      * computes an index into a 1D array that matches bounds. The value this returns will be between 0 (inclusive) and
      * the product of each element in bounds (exclusive), unless the given point does not fit in bounds. If point is
      * out-of-bounds, this always returns -1, and callers should check for -1 as an output.
-     * @param bounds the bounding dimension lengths as an int array
-     * @param point the coordinates of the point to encode as a int array or vararg; must have a length at least equal
+     * @param bounds the bounding dimension lengths as a long array
+     * @param point the coordinates of the point to encode as a long array or vararg; must have a length at least equal
      *              to the length of bounds, and only items that correspond to dimensions in bounds will be used
      * @return an index into a 1D array that is sized to contain all of bounds, or -1 if point is invalid
      */
@@ -160,18 +157,8 @@ public class RegionPacker {
         return u;
     }
 
-    /**
-     * Given an index into a bounded 1D array as produced by boundedIndex(), reproduces the point at the bounded index.
-     * The point is represented as an int array with equivalent dimension count as bounds. The earliest dimension, at
-     * index 0, is considered the most significant for the integer value of index.
-     * @param bounds the bounding dimension lengths as an int array
-     * @param index the index, as could be produced by boundedIndex()
-     * @return the point referred to be index within the given bounds.
-     */
     public static int[] fromBounded(int[] bounds, int index)
     {
-        if(index < 0)
-            throw new ArrayIndexOutOfBoundsException("Index must not be negative");
         int[] point = new int[bounds.length];
         int u = 1;
         for (int a = bounds.length - 1; a >= 0; a--) {
@@ -182,47 +169,168 @@ public class RegionPacker {
     }
 
     /**
-     * Compresses a boolean array of data encoded so the lowest-index dimensions are the most significant, using the
-     * specified bounds to determine the conversion from n-dimensional to 1-dimensional, returning a compressed bitset
-     * from the JavaEWAH library, EWAHCompressedBitmap32.
+     * Compresses a double[][] that only stores two
+     * relevant states (one of which should be 0 or less, the other greater than 0), returning a short[] as described in
+     * the {@link RegionPackerDIY} class documentation. This short[] can be passed to RegionPacker.unpack() to restore the
+     * relevant states and their positions as a boolean[][] (with false meaning 0 or less and true being any double
+     * greater than 0). As stated in the class documentation, the compressed result is intended to use as little memory
+     * as possible for 2D arrays with contiguous areas of "on" cells.
+     *<br>
+     * <b>To store more than two states</b>, you should use packMulti().
      *
-     * @param data a boolean array that is encodes so .
+     * @param map a double[][] that probably was returned by FOV. If you obtained a double[][] from DijkstraMap, it
+     *            will not meaningfully compress with this method.
      * @return a packed short[] that should, in most circumstances, be passed to unpack() when it needs to be used.
      */
-    public EWAHCompressedBitmap32 pack(boolean[] data, int[] bounds)
+    public Region pack(double[][] map)
     {
-        if(data == null || data.length == 0)
+        if(map == null || map.length == 0)
             throw new ArrayIndexOutOfBoundsException("RegionPacker.pack() must be given a non-empty array");
-        if(bounds == null || curve.dimensionality.length != bounds.length)
-            throw new UnsupportedOperationException("Invalid bounds; should be an array with " +
-                    curve.dimensionality.length + " elements");
-        long b = 1;
-        for (int i = 0; i < bounds.length; i++) {
-            if(bounds[i] > curve.dimensionality[i])
-                throw new UnsupportedOperationException("Bound size at dimension " + i
-                        + " is too large for given CurveStrategy, should be no more than " + curve.dimensionality[i]);
-            b *= bounds[i];
-        }
-        if(b > 1L << 30)
-            throw new UnsupportedOperationException("Bounds are too big!");
-
-        EWAHCompressedBitmap32 packing = new EWAHCompressedBitmap32();
-        int[] pt = new int[bounds.length];
-        for (int i = 0, len = 0, idx; i < curve.maxDistance && len < data.length; i++) {
-            idx = boundedIndex(bounds, curve.alter(pt, i));
-            if(idx >= 0 && data[idx])
+        int xSize = map.length, ySize = map[0].length;
+        if(xSize > curve.dimensionality[0] || ySize > curve.dimensionality[1])
+            throw new UnsupportedOperationException("Array size is too large for given CurveStrategy, aborting");
+        Region packing = new Region();
+        boolean on = false, anyAdded = false, current;
+        int skip = 0, limit = curve.maxDistance, mapLimit = xSize * ySize;
+        int[] pt;
+        for(int i = 0, ml = 0; i < limit && ml < mapLimit; i++, skip++)
+        {
+            pt = curve.point(i);
+            if(pt[0] >= xSize || pt[1] >= ySize) {
+                if(on) {
+                    on = false;
+                    packing.add(skip);
+                    skip = 0;
+                    anyAdded = true;
+                }
+                continue;
+            }
+            ml++;
+            current = map[pt[0]][pt[1]] > 0.0;
+            if(current != on)
             {
-                packing.set(i);
+                packing.add(skip);
+                skip = 0;
+                on = current;
+                anyAdded = true;
             }
         }
-        if(packing.isEmpty())
+        if(on)
+            packing.add(skip);
+        else if(!anyAdded)
+            return ALL_WALL;
+        return packing;
+    }
+
+
+    /**
+     * Compresses a boolean[][], returning a short[] as described in the {@link RegionPackerDIY} class documentation. This
+     * short[] can be passed to RegionPacker.unpack() to restore the relevant states and their positions as a boolean[][]
+     * As stated in the class documentation, the compressed result is intended to use as little memory as possible for
+     * 2D arrays with contiguous areas of "on" cells.
+     *
+     * @param map a boolean[][] that should ideally be mostly false.
+     * @return a packed short[] that should, in most circumstances, be passed to unpack() when it needs to be used.
+     */
+    public Region pack(boolean[][] map)
+    {
+        if(map == null || map.length == 0)
+            throw new ArrayIndexOutOfBoundsException("RegionPacker.pack() must be given a non-empty array");
+        int xSize = map.length, ySize = map[0].length;
+        if(xSize > curve.dimensionality[0] || ySize > curve.dimensionality[1])
+            throw new UnsupportedOperationException("Array size is too large for given CurveStrategy, aborting");
+        Region packing = new Region();
+        boolean on = false, anyAdded = false, current;
+        int skip = 0, limit = curve.maxDistance, mapLimit = xSize * ySize;
+        int[] pt;
+
+        for(int i = 0, ml = 0; i < limit && ml < mapLimit; i++, skip++)
+        {
+            pt = curve.point(i);
+            if(pt[0] >= xSize || pt[1] >= ySize) {
+                if(on) {
+                    on = false;
+                    packing.add(skip);
+                    skip = 0;
+                    anyAdded = true;
+                }
+                continue;
+            }
+            ml++;
+            current = map[pt[0]][pt[1]];
+            if(current != on)
+            {
+                packing.add(skip);
+                skip = 0;
+                on = current;
+                anyAdded = true;
+            }
+        }
+        if(on)
+            packing.add(skip);
+        else if(!anyAdded)
+            return ALL_WALL;
+        return packing;
+    }
+
+    /**
+     * Compresses a char[][] (typically one generated by a map generating method) so only the cells that equal the yes
+     * parameter will be encoded as "on", returning a short[] as described in
+     * the {@link RegionPackerDIY} class documentation. This short[] can be passed to RegionPacker.unpack() to restore the
+     * positions of chars that equal the parameter yes as a boolean[][] (with false meaning not equal and true equal to
+     * yes). As stated in the class documentation, the compressed result is intended to use as little memory
+     * as possible for 2D arrays with contiguous areas of "on" cells.
+     *
+     * @param map a char[][] that may contain some area of cells that you want stored as packed data
+     * @param yes the char to encode as "on" in the result; all others are encoded as "off"
+     * @return a Region that can be passed to other methods in this class
+     */
+    public Region pack(char[][] map, char yes)
+    {
+        if(map == null || map.length == 0)
+            throw new ArrayIndexOutOfBoundsException("RegionPacker.pack() must be given a non-empty array");
+        if(curve.dimensionality.length != 2)
+            throw new UnsupportedOperationException("2D array methods can only be used when the CurveStrategy is 2D");
+        int xSize = map.length, ySize = map[0].length;
+        if(xSize > curve.dimensionality[0] || ySize > curve.dimensionality[1])
+            throw new UnsupportedOperationException("Array size is too large for given CurveStrategy, aborting");
+        Region packing = new Region(64);
+        boolean on = false, anyAdded = false, current;
+        int skip = 0, limit = curve.maxDistance, mapLimit = xSize * ySize;
+        int[] pt;
+
+        for(int i = 0, ml = 0; i < limit && ml < mapLimit; i++, skip++)
+        {
+            pt = curve.point(i);
+            if(pt[0] >= xSize || pt[1] >= ySize) {
+                if(on) {
+                    on = false;
+                    packing.add((short) skip);
+                    skip = 0;
+                    anyAdded = true;
+                }
+                continue;
+            }
+            ml++;
+            current = map[pt[0]][pt[1]] == yes;
+            if(current != on)
+            {
+                packing.add((short) skip);
+                skip = 0;
+                on = current;
+                anyAdded = true;
+            }
+        }
+        if(on)
+            packing.add((short)skip);
+        else if(!anyAdded)
             return ALL_WALL;
         return packing;
     }
 
     /**
      * Decompresses a short[] returned by pack() or a sub-array of a short[][] returned by packMulti(), as described in
-     * the {@link RegionPacker} class documentation. This returns a boolean[][] that stores the same values that were
+     * the {@link RegionPackerDIY} class documentation. This returns a boolean[][] that stores the same values that were
      * packed if the overload of pack() taking a boolean[][] was used. If a double[][] was compressed with pack(), the
      * boolean[][] this returns will have true for all values greater than 0 and false for all others. If this is one
      * of the sub-arrays compressed by packMulti(), the index of the sub-array will correspond to an index in the levels
@@ -234,38 +342,39 @@ public class RegionPacker {
      *               the CurveStrategy this RegionPacker was constructed with.
      * @return a 1D boolean array representing the multi-dimensional area of bounds, where true is on and false is off
      */
-    public boolean[] unpack(EWAHCompressedBitmap32 packed, final int[] bounds)
+    public boolean[] unpack(Region packed, final int[] bounds)
     {
         if(packed == null)
             throw new ArrayIndexOutOfBoundsException("RegionPacker.unpack() must be given a non-null Region");
         if(bounds == null || bounds.length != curve.dimensionality.length)
             throw new UnsupportedOperationException("Invalid bounds; should be an array with " +
                     curve.dimensionality.length + " elements");
-        long b = 1;
-        for (int i = 0; i < bounds.length; i++) {
-            if(bounds[i] > curve.dimensionality[i])
-                throw new UnsupportedOperationException("Bound size at dimension " + i
-                        + " is too large for given CurveStrategy, should be no more than " + curve.dimensionality[i]);
+        int b = bounds[0];
+        for (int i = 1; i < bounds.length; i++) {
             b *= bounds[i];
         }
-        if(b > 1L << 30)
+        if(b >= 1L << 31)
             throw new UnsupportedOperationException("Bounds are too big!");
-
-
-        final boolean[] unpacked = new boolean[(int)b];
-
-        if(packed.isEmpty())
+        final boolean[] unpacked = new boolean[b];
+        if(packed.size() == 0)
             return unpacked;
-
-        IntIterator it = packed.intIterator();
-        int[] pt = new int[bounds.length];
-        int idx = 0;
-        while (it.hasNext())
-        {
-            idx = boundedIndex(bounds, curve.alter(pt, it.next()));
-            if(idx >= 0)
-                unpacked[idx] = true;
-        }
+        packed.forEachWithIndex(new IntIntProcedure() {
+            int idx = 0;
+            public void value(int each, int odd) {
+                if(odd % 2 == 1)
+                {
+                    for (int toSkip = idx + each; idx < toSkip && idx < curve.maxDistance; idx++) {
+                        int u = boundedIndex(bounds, curve.point(idx));
+                        if(u >= 0)
+                            unpacked[u] = true;
+                    }
+                }
+                else
+                {
+                    idx += each;
+                }
+            }
+        });
         return unpacked;
     }
 
@@ -378,14 +487,22 @@ public class RegionPacker {
      * @param coordinates a vararg or array of coordinates; should have length equal to curve dimensions
      * @return true if the packed data stores true at the given x,y location, or false in any other case.
      */
-    public boolean queryPacked(EWAHCompressedBitmap32 packed, int... coordinates)
+    public boolean queryPacked(Region packed, int... coordinates)
     {
         int hilbertDistance = curve.distance(coordinates), total = 0;
         if(hilbertDistance < 0)
             return false;
-        return packed.get(hilbertDistance);
+        boolean on = false;
+        IntIterator it = packed.intIterator();
+        while(it.hasNext())
+        {
+            total += it.next();
+            if(hilbertDistance < total)
+                return on;
+            on = !on;
+        }
+        return false;
     }
-
     /**
      * Quickly determines if a Hilbert Curve index corresponds to true or false in the given packed array, without
      * unpacking it.
@@ -398,11 +515,21 @@ public class RegionPacker {
      * @param hilbert a Hilbert Curve index, such as one taken directly from a packed short[] without extra processing
      * @return true if the packed data stores true at the given Hilbert Curve index, or false in any other case.
      */
-    public boolean queryPackedHilbert(EWAHCompressedBitmap32 packed, int hilbert)
+    public boolean queryPackedHilbert(Region packed, int hilbert)
     {
         if(hilbert < 0 || hilbert >= curve.maxDistance)
             return false;
-        return packed.get(hilbert);
+        int total = 0;
+        boolean on = false;
+        IntIterator it = packed.intIterator();
+        while(it.hasNext())
+        {
+            total += it.next();
+            if(hilbert < total)
+                return on;
+            on = !on;
+        }
+        return false;
     }
 
     /**
@@ -411,10 +538,11 @@ public class RegionPacker {
      *               not be null (this method does not check due to very tight performance constraints).
      * @return a Coord[], ordered by distance along the Hilbert Curve, corresponding to all "on" cells in packed.
      */
-    public int[][] allPacked(EWAHCompressedBitmap32 packed)
+    public int[][] allPacked(Region packed)
     {
-        int[][] cs = new int[packed.cardinality()][curve.dimensionality.length];
-        IntIterator it = packed.intIterator();
+        IntArrayList distances = packed.onIndices();
+        int[][] cs = new int[distances.size()][curve.dimensionality.length];
+        IntIterator it = distances.intIterator();
         int i = 0;
         while (it.hasNext())
             cs[i++] = curve.point(it.next());
@@ -431,9 +559,9 @@ public class RegionPacker {
      *               not be null (this method does not check due to very tight performance constraints).
      * @return a Hilbert Curve index array, in ascending distance order, corresponding to all "on" cells in packed.
      */
-    public int[] allPackedHilbert(EWAHCompressedBitmap32 packed)
+    public int[] allPackedHilbert(Region packed)
     {
-        return packed.toArray();
+        return packed.onIndices().toArray();
     }
 
     private static int clamp(int n, int min, int max)
