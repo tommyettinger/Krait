@@ -565,7 +565,7 @@ public class ShortSet {
         }
 
         /** Returns a new array containing the remaining keys. */
-        public ShortVLA toArray () {
+        public ShortVLA toVLA () {
             ShortVLA array = new ShortVLA(true, set.size);
             while (hasNext)
                 array.add(next());

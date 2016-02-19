@@ -210,9 +210,11 @@ public class RegionPacker {
         int[] pt = new int[bounds.length];
         for (int i = 0, len = 0, idx; i < curve.maxDistance && len < data.length; i++) {
             idx = boundedIndex(bounds, curve.alter(pt, i));
-            if(idx >= 0 && data[idx])
+            if(idx >= 0)
             {
-                packing.set(i);
+                len++;
+                if(data[idx])
+                    packing.set(i);
             }
         }
         if(packing.isEmpty())
@@ -259,7 +261,7 @@ public class RegionPacker {
 
         IntIterator it = packed.intIterator();
         int[] pt = new int[bounds.length];
-        int idx = 0;
+        int idx;
         while (it.hasNext())
         {
             idx = boundedIndex(bounds, curve.alter(pt, it.next()));
@@ -372,9 +374,8 @@ public class RegionPacker {
     */
 
     /**
-     * Quickly determines if an x,y position is true or false in the given packed array, without unpacking it.
-     * @param packed a short[] returned by pack() or one of the sub-arrays in what is returned by packMulti(); must
-     *               not be null (this method does not check due to very tight performance constraints).
+     * Quickly determines if an x,y position is true or false in the given packed data, without unpacking it.
+     * @param packed an EWAHCompressedBitmap32 returned by pack() or a related method; must not be null.
      * @param coordinates a vararg or array of coordinates; should have length equal to curve dimensions
      * @return true if the packed data stores true at the given x,y location, or false in any other case.
      */
@@ -387,15 +388,14 @@ public class RegionPacker {
     }
 
     /**
-     * Quickly determines if a Hilbert Curve index corresponds to true or false in the given packed array, without
+     * Quickly determines if a Hilbert Curve index corresponds to true or false in the given packed data, without
      * unpacking it.
      * <br>
      * Typically this method will not be needed by library-consuming code unless that code deals with Hilbert Curves in
      * a frequent and deeply involved manner. It does have the potential to avoid converting to and from x,y coordinates
      * and Hilbert Curve indices unnecessarily, which could matter for high-performance code.
-     * @param packed a short[] returned by pack() or one of the sub-arrays in what is returned by packMulti(); must
-     *               not be null (this method does not check due to very tight performance constraints).
-     * @param hilbert a Hilbert Curve index, such as one taken directly from a packed short[] without extra processing
+     * @param packed an EWAHCompressedBitmap32 returned by pack() or a related method; must not be null.
+     * @param hilbert a Hilbert Curve index, such as one taken directly from packed data without extra processing
      * @return true if the packed data stores true at the given Hilbert Curve index, or false in any other case.
      */
     public boolean queryPackedHilbert(EWAHCompressedBitmap32 packed, int hilbert)
@@ -441,6 +441,28 @@ public class RegionPacker {
         return Math.min(Math.max(min, n), max - 1);
     }
 
+    private int clampedDistanceTranslate(int[] pt, int[] bounds, int[] movement)
+    {
+        for (int i = 0; i < pt.length; i++) {
+            pt[i] = clamp(pt[i] + movement[i], 0, bounds[i]);
+        }
+        return curve.distance(pt);
+    }
+
+    private void clampedDistanceExpandChebyshev(IntVLA vla, int[] pt, int[] bounds, int expansion)
+    {
+        int[] move = new int[pt.length];
+        int side = expansion * 2 + 1, exp = (int)Math.pow(side, pt.length), limit;
+
+        for (int i = 0; i < exp; i++) {
+            limit = side;
+            for (int d = 0; d < pt.length; d++) {
+                move[d] = (i % limit) - expansion;
+                limit *= side;
+            }
+            vla.add(clampedDistanceTranslate(pt, bounds, move));
+        }
+    }
     /**
      * Move all "on" positions in packed by the number of cells given in xMove and yMove, unless the move
      * would take them further than 0, width - 1 (for xMove) or height - 1 (for yMove), in which case that
@@ -448,54 +470,28 @@ public class RegionPacker {
      * height will move all "on" cells to that edge, in a 1-cell thick line). Returns a new packed short[]
      * and does not modify packed.
      * @param packed a short[] returned by pack() or one of the sub-arrays in what is returned by packMulti()
-     * @param xMove distance to move the x-coordinate; can be positive or negative
-     * @param yMove distance to move the y-coordinate; can be positive or negative
-     * @param width the maximum width; if a cell would move to x at least equal to width, it stops at width - 1
-     * @param height the maximum height; if a cell would move to y at least equal to height, it stops at height - 1
-     * @return a packed array that encodes "on" for cells that were moved from cells that were "on" in packed
+     * @param bounds the bounds of the positions to translate; bits will stop before they hit the bounds or go negative
+     * @param movement an array that shound have identical length to bounds; stores movement in each dimension to apply
+     * @return new packed data that encodes "on" for cells that were moved from cells that were "on" in packed
      */
-    public static short[] translate(short[] packed, int xMove, int yMove, int width, int height)
+    public EWAHCompressedBitmap32 translate(EWAHCompressedBitmap32 packed, int[] bounds, int[] movement)
     {
-        if(packed == null || packed.length <= 1)
+        if(packed == null || packed.isEmpty())
         {
             return ALL_WALL;
         }
-        ShortVLA vla = new ShortVLA(256);
-        boolean on = false;
-        int idx = 0, x, y;
-        for(int p = 0; p < packed.length; p++, on = !on) {
-            if (on) {
-                for (int i = idx; i < idx + (packed[p] & 0xffff); i++) {
-                    x = clamp(hilbertX[i] + xMove, 0, width);
-                    y = clamp(hilbertY[i] + yMove, 0, height);
-                    vla.add(hilbertDistances[x + (y << 8)]);
-                }
-            }
-            idx += packed[p] & 0xffff;
+        IntVLA vla = new IntVLA(256);
+        int x, y;
+        IntIterator it = packed.intIterator();
+        int[] pt = new int[bounds.length];
+        while (it.hasNext()) {
+            vla.add(clampedDistanceTranslate(curve.alter(pt, it.next()), bounds, movement));
         }
-        int[] indices = vla.asInts();
-        if(indices.length < 1)
+        if(vla.size < 1)
             return ALL_WALL;
-        Arrays.sort(indices);
-        vla = new ShortVLA(128);
-        int current, past = indices[0], skip = 0;
+        vla.sort();
 
-        vla.add((short)indices[0]);
-        for (int i = 1; i < indices.length; i++) {
-            current = indices[i];
-            if (current - past > 1)
-            {
-                vla.add((short) (skip+1));
-                skip = 0;
-                vla.add((short)(current - past - 1));
-            }
-            else if(current != past)
-                skip++;
-            past = current;
-        }
-        vla.add((short)(skip+1));
-
-        return vla.toArray();
+        return EWAHCompressedBitmap32.bitmapOf(vla.toArray());
     }
 
     /**
@@ -505,17 +501,15 @@ public class RegionPacker {
      * Returns a new packed short[] and does not modify packed.
      * @param packed a short[] returned by pack() or one of the sub-arrays in what is returned by packMulti()
      * @param expansion the positive (square) radius, in cells, to expand each cell out by
-     * @param width the maximum width; if a cell would move to x at least equal to width, it stops at width - 1
-     * @param height the maximum height; if a cell would move to y at least equal to height, it stops at height - 1
      * @return a packed array that encodes "on" for packed and cells that expanded from cells that were "on" in packed
      */
-    public static short[] expand(short[] packed, int expansion, int width, int height)
+    public EWAHCompressedBitmap32 expand(EWAHCompressedBitmap32 packed, int expansion, int[] bounds)
     {
-        if(packed == null || packed.length <= 1)
+        if(packed == null || packed.isEmpty())
         {
             return ALL_WALL;
         }
-        ShortVLA vla = new ShortVLA(256);
+        IntVLA vla = new IntVLA(256);
         ShortSet ss = new ShortSet(256);
         boolean on = false;
         int idx = 0, x, y;
@@ -542,7 +536,7 @@ public class RegionPacker {
             return ALL_WALL;
         Arrays.sort(indices);
 
-        vla = new ShortVLA(128);
+        vla = new IntVLA(128);
         int current, past = indices[0], skip = 0;
 
         vla.add((short)indices[0]);
@@ -583,7 +577,7 @@ public class RegionPacker {
         {
             return ALL_WALL;
         }
-        ShortVLA vla = new ShortVLA(256);
+        IntVLA vla = new IntVLA(256);
         ShortSet ss = new ShortSet(256);
         boolean on = false;
         int idx = 0, x, y;
@@ -615,7 +609,7 @@ public class RegionPacker {
             return ALL_WALL;
         Arrays.sort(indices);
 
-        vla = new ShortVLA(128);
+        vla = new IntVLA(128);
         int current, past = indices[0], skip = 0;
 
         vla.add((short)indices[0]);
@@ -655,7 +649,7 @@ public class RegionPacker {
         {
             return ALL_WALL;
         }
-        ShortVLA vla = new ShortVLA(256);
+        IntVLA vla = new IntVLA(256);
         ShortSet ss = new ShortSet(256);
         boolean on = false;
         int idx = 0;
@@ -691,7 +685,7 @@ public class RegionPacker {
             return ALL_WALL;
         Arrays.sort(indices);
 
-        vla = new ShortVLA(128);
+        vla = new IntVLA(128);
         int current, past = indices[0], skip = 0;
 
         vla.add((short)indices[0]);
@@ -734,7 +728,7 @@ public class RegionPacker {
         {
             return ALL_WALL;
         }
-        ShortVLA vla = new ShortVLA(256);
+        IntVLA vla = new IntVLA(256);
         ShortSet ss = new ShortSet(256);
         boolean on = false;
         int idx = 0;
@@ -776,7 +770,7 @@ public class RegionPacker {
             return ALL_WALL;
         Arrays.sort(indices);
 
-        vla = new ShortVLA(128);
+        vla = new IntVLA(128);
         int current, past = indices[0], skip = 0;
 
         vla.add((short)indices[0]);
@@ -832,7 +826,7 @@ public class RegionPacker {
             idx += packed[p] & 0xffff;
         }
         for (int expansion = 1; expansion <= expansions; expansion++) {
-            ShortVLA vla = new ShortVLA(256);
+            IntVLA vla = new IntVLA(256);
             on = false;
             idx = 0;
             for (int p = 0; p < packed.length; p++, on = !on) {
@@ -859,7 +853,7 @@ public class RegionPacker {
             }
             Arrays.sort(indices);
 
-            vla = new ShortVLA(128);
+            vla = new IntVLA(128);
             int current, past = indices[0], skip = 0;
 
             vla.add((short) indices[0]);
@@ -920,7 +914,7 @@ public class RegionPacker {
             idx += packed[p] & 0xffff;
         }
         for (int expansion = 1; expansion <= expansions; expansion++) {
-            ShortVLA vla = new ShortVLA(256);
+            IntVLA vla = new IntVLA(256);
             on = false;
             idx = 0;
             for (int p = 0; p < packed.length; p++, on = !on) {
@@ -951,7 +945,7 @@ public class RegionPacker {
             }
             Arrays.sort(indices);
 
-            vla = new ShortVLA(128);
+            vla = new IntVLA(128);
             int current, past = indices[0], skip = 0;
 
             vla.add((short) indices[0]);
@@ -996,7 +990,7 @@ public class RegionPacker {
             return ALL_WALL;
         }
         int boundSize = count(bounds);
-        ShortVLA vla = new ShortVLA(256);
+        IntVLA vla = new IntVLA(256);
         ShortSet ss = new ShortSet(boundSize), quickBounds = new ShortSet(boundSize);
         boolean on = false;
         int idx = 0;
@@ -1012,7 +1006,7 @@ public class RegionPacker {
         short[] s2 = allPackedHilbert(start);
         int[] xOffsets = new int[]{0, 1, 0, -1}, yOffsets = new int[]{1, 0, -1, 0};
         for (int e = 0; e < expansion; e++) {
-            ShortVLA edge = new ShortVLA(128);
+            IntVLA edge = new IntVLA(128);
             for (int s = 0; s < s2.length; s++) {
                 int i = s2[s] & 0xffff;
                 x = hilbertX[i];
@@ -1037,7 +1031,7 @@ public class RegionPacker {
             return ALL_WALL;
         Arrays.sort(indices);
 
-        vla = new ShortVLA(128);
+        vla = new IntVLA(128);
         int current, past = indices[0], skip = 0;
 
         vla.add((short)indices[0]);
@@ -1083,7 +1077,7 @@ public class RegionPacker {
             return ALL_WALL;
         }
         int boundSize = count(bounds);
-        ShortVLA vla = new ShortVLA(256);
+        IntVLA vla = new IntVLA(256);
         ShortSet ss = new ShortSet(boundSize), quickBounds = new ShortSet(boundSize);
         boolean on = false;
         int idx = 0;
@@ -1099,7 +1093,7 @@ public class RegionPacker {
         short[] s2 = allPackedHilbert(start);
         int[] xOffsets = new int[]{-1, 0, 1, -1,    1, -1, 0, 1}, yOffsets = new int[]{-1, -1, -1, 0,    0, 1, 1, 1};
         for (int e = 0; e < expansion; e++) {
-            ShortVLA edge = new ShortVLA(128);
+            IntVLA edge = new IntVLA(128);
             for (int s = 0; s < s2.length; s++) {
                 int i = s2[s] & 0xffff;
                 x = hilbertX[i];
@@ -1124,7 +1118,7 @@ public class RegionPacker {
             return ALL_WALL;
         Arrays.sort(indices);
 
-        vla = new ShortVLA(128);
+        vla = new IntVLA(128);
         int current, past = indices[0], skip = 0;
 
         vla.add((short)indices[0]);
@@ -1146,7 +1140,7 @@ public class RegionPacker {
     }
 
 
-    private static void modifiedShadowFOV(int expansion, int viewerX, int viewerY, Radius metric, ShortSet bounds, ShortSet storedSet, ShortVLA vla)
+    private static void modifiedShadowFOV(int expansion, int viewerX, int viewerY, Radius metric, ShortSet bounds, ShortSet storedSet, IntVLA vla)
     {
         if(expansion < 1)
             return;
@@ -1161,7 +1155,7 @@ public class RegionPacker {
     }
 
     private static void modifiedShadowCast(int expansion, int row, double start, double end, int xx, int xy, int yx, int yy,
-                                     int viewerX, int viewerY, Radius metric, ShortSet bounds, ShortSet storedSet, ShortVLA vla) {
+                                     int viewerX, int viewerY, Radius metric, ShortSet bounds, ShortSet storedSet, IntVLA vla) {
         double newStart = 0;
         if (start < end) {
             return;
@@ -1270,7 +1264,7 @@ public class RegionPacker {
             return ALL_WALL;
         }
         int boundSize = count(bounds);
-        ShortVLA vla = new ShortVLA(256);
+        IntVLA vla = new IntVLA(256);
         ShortSet storedSet = new ShortSet(boundSize), quickBounds = new ShortSet(boundSize);
         boolean on = false;
         int idx = 0, i;
@@ -1297,7 +1291,7 @@ public class RegionPacker {
             return ALL_WALL;
         Arrays.sort(indices);
 
-        vla = new ShortVLA(128);
+        vla = new IntVLA(128);
         int current, past = indices[0], skip = 0;
 
         vla.add((short)indices[0]);
@@ -1467,7 +1461,7 @@ public class RegionPacker {
             return right;
         if(right.length == 0)
             return left;
-        ShortVLA packing = new ShortVLA(64);
+        IntVLA packing = new IntVLA(64);
         boolean on = false, onLeft = false, onRight = false;
         int idx = 0, skip = 0, elemLeft = 0, elemRight = 0, totalLeft = 0, totalRight = 0;
         while ((elemLeft < left.length || elemRight < right.length) && idx <= 0xffff) {
@@ -1547,7 +1541,7 @@ public class RegionPacker {
     {
         if(left.length == 0 || right.length == 0)
             return ALL_WALL;
-        ShortVLA packing = new ShortVLA(64);
+        IntVLA packing = new IntVLA(64);
         boolean on = false, onLeft = false, onRight = false;
         int idx = 0, skip = 0, elemLeft = 0, elemRight = 0, totalLeft = 0, totalRight = 0;
         while ((elemLeft < left.length && elemRight < right.length) && idx <= 0xffff) {
@@ -1656,7 +1650,7 @@ public class RegionPacker {
             return ALL_WALL;
         if(right.length <= 1)
             return left;
-        ShortVLA packing = new ShortVLA(64);
+        IntVLA packing = new IntVLA(64);
         boolean on = false, onLeft = false, onRight = false;
         int idx = 0, skip = 0, elemLeft = 0, elemRight = 0, totalLeft = 0, totalRight = 0;
         while ((elemLeft < left.length || elemRight < right.length) && idx <= 0xffff) {
@@ -1734,7 +1728,7 @@ public class RegionPacker {
             return right;
         if(right.length == 0)
             return left;
-        ShortVLA packing = new ShortVLA(64);
+        IntVLA packing = new IntVLA(64);
         boolean on = false, onLeft = false, onRight = false;
         int idx = 0, skip = 0, elemLeft = 0, elemRight = 0, totalLeft = 0, totalRight = 0;
         while ((elemLeft < left.length || elemRight < right.length) && idx <= 0xffff) {
@@ -1842,7 +1836,7 @@ public class RegionPacker {
         if(hilbert.length == 0)
             return ALL_WALL;
         Arrays.sort(hilbert);
-        ShortVLA vla = new ShortVLA(128);
+        IntVLA vla = new IntVLA(128);
         int current, past = hilbert[0], skip = 0;
 
         vla.add((short)hilbert[0]);
@@ -1877,7 +1871,7 @@ public class RegionPacker {
         }
 
         Arrays.sort(hilbert);
-        ShortVLA vla = new ShortVLA(128);
+        IntVLA vla = new IntVLA(128);
         int current, past = hilbert[0], skip = 0;
 
         vla.add((short)hilbert[0]);
@@ -2048,7 +2042,7 @@ public class RegionPacker {
     public static Coord[] randomSample(short[] packed, double fraction, RNG rng)
     {
         int counted = count(packed);
-        ShortVLA vla = new ShortVLA((int)(counted * fraction) + 1);
+        IntVLA vla = new IntVLA((int)(counted * fraction) + 1);
         boolean on = false;
         int idx = 0;
         for(int p = 0; p < packed.length; p++, on = !on) {
