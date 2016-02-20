@@ -2,6 +2,7 @@ package com.github.tommyettinger;
 
 import com.googlecode.javaewah.IntIterator;
 import com.googlecode.javaewah32.EWAHCompressedBitmap32;
+import it.unimi.dsi.fastutil.ints.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -122,6 +123,17 @@ public class RegionPacker {
 
     public final EWAHCompressedBitmap32 ALL_WALL,
             ALL_ON;
+    private static final int[] manhattan_100 = new int[]
+            {
+                    0, 1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 66, 78, 91, 105, 120, 136,
+                    153, 171, 190, 210, 231, 253, 276, 300, 325, 351, 378, 406, 435, 465,
+                    496, 528, 561, 595, 630, 666, 703, 741, 780, 820, 861, 903, 946, 990,
+                    1035, 1081, 1128, 1176, 1225, 1275, 1326, 1378, 1431, 1485, 1540,
+                    1596, 1653, 1711, 1770, 1830, 1891, 1953, 2016, 2080, 2145, 2211,
+                    2278, 2346, 2415, 2485, 2556, 2628, 2701, 2775, 2850, 2926, 3003,
+                    3081, 3160, 3240, 3321, 3403, 3486, 3570, 3655, 3741, 3828, 3916,
+                    4005, 4095, 4186, 4278, 4371, 4465, 4560, 4656, 4753, 4851, 4950
+            };
     public CurveStrategy curve;
     public RegionPacker()
     {
@@ -183,7 +195,7 @@ public class RegionPacker {
 
     /**
      * Compresses a boolean array of data encoded so the lowest-index dimensions are the most significant, using the
-     * specified bounds to determine the conversion from n-dimensional to 1-dimensional, returning a compressed bitset
+     * specified bounds to determine the conversion from n-dimensional to 1-dimensional, returning a compressed bitmap
      * from the JavaEWAH library, EWAHCompressedBitmap32.
      *
      * @param data a boolean array that is encodes so .
@@ -223,15 +235,10 @@ public class RegionPacker {
     }
 
     /**
-     * Decompresses a short[] returned by pack() or a sub-array of a short[][] returned by packMulti(), as described in
-     * the {@link RegionPacker} class documentation. This returns a boolean[][] that stores the same values that were
-     * packed if the overload of pack() taking a boolean[][] was used. If a double[][] was compressed with pack(), the
-     * boolean[][] this returns will have true for all values greater than 0 and false for all others. If this is one
-     * of the sub-arrays compressed by packMulti(), the index of the sub-array will correspond to an index in the levels
-     * array passed to packMulti(), and any cells that were at least equal to the corresponding value in levels will be
-     * true, while all others will be false. Width and height do not technically need to match the dimensions of the
-     * original 2D array, but under most circumstances where they don't match, the data produced will be junk.
-     * @param packed a Region encoded by calling one of this class' packing methods.
+     * Decompresses a packed bitmap returned by pack(), as described in
+     * the {@link RegionPacker} class documentation. This returns a boolean[] that stores the same values that were
+     * packed if the overload of pack() taking a boolean[] was used.
+     * @param packed a packed bitmap encoded by calling one of this class' packing methods.
      * @param bounds the dimensions of the area to encode; must be no larger in any dimension than the dimensionality of
      *               the CurveStrategy this RegionPacker was constructed with.
      * @return a 1D boolean array representing the multi-dimensional area of bounds, where true is on and false is off
@@ -375,7 +382,7 @@ public class RegionPacker {
 
     /**
      * Quickly determines if an x,y position is true or false in the given packed data, without unpacking it.
-     * @param packed an EWAHCompressedBitmap32 returned by pack() or a related method; must not be null.
+     * @param packed a packed bitmap returned by pack() or a related method; must not be null.
      * @param coordinates a vararg or array of coordinates; should have length equal to curve dimensions
      * @return true if the packed data stores true at the given x,y location, or false in any other case.
      */
@@ -394,7 +401,7 @@ public class RegionPacker {
      * Typically this method will not be needed by library-consuming code unless that code deals with Hilbert Curves in
      * a frequent and deeply involved manner. It does have the potential to avoid converting to and from x,y coordinates
      * and Hilbert Curve indices unnecessarily, which could matter for high-performance code.
-     * @param packed an EWAHCompressedBitmap32 returned by pack() or a related method; must not be null.
+     * @param packed a packed bitmap returned by pack() or a related method; must not be null.
      * @param hilbert a Hilbert Curve index, such as one taken directly from packed data without extra processing
      * @return true if the packed data stores true at the given Hilbert Curve index, or false in any other case.
      */
@@ -407,9 +414,9 @@ public class RegionPacker {
 
     /**
      * Gets all positions that are "on" in the given packed array, without unpacking it, and returns them as a Coord[].
-     * @param packed a short[] returned by pack() or one of the sub-arrays in what is returned by packMulti(); must
-     *               not be null (this method does not check due to very tight performance constraints).
-     * @return a Coord[], ordered by distance along the Hilbert Curve, corresponding to all "on" cells in packed.
+     * @param packed a packed bitmap returned by pack() or a similar method
+     * @return an array of int arrays representing points, ordered by distance for those points along the Hilbert Curve,
+     * corresponding to all "on" cells in packed.
      */
     public int[][] allPacked(EWAHCompressedBitmap32 packed)
     {
@@ -427,8 +434,7 @@ public class RegionPacker {
      * Typically this method will not be needed by library-consuming code unless that code deals with Hilbert Curves in
      * a frequent and deeply involved manner. It does have the potential to avoid converting to and from x,y coordinates
      * and Hilbert Curve indices unnecessarily, which could matter for high-performance code.
-     * @param packed a short[] returned by pack() or one of the sub-arrays in what is returned by packMulti(); must
-     *               not be null (this method does not check due to very tight performance constraints).
+     * @param packed a packed bitmap returned by pack() or a similar method
      * @return a Hilbert Curve index array, in ascending distance order, corresponding to all "on" cells in packed.
      */
     public int[] allPackedHilbert(EWAHCompressedBitmap32 packed)
@@ -441,7 +447,7 @@ public class RegionPacker {
         return Math.min(Math.max(min, n), max - 1);
     }
 
-    private int clampedDistanceTranslate(int[] pt, int[] bounds, int[] movement)
+    private int clampedDistanceTranslateInPlace(int[] pt, int[] bounds, int[] movement)
     {
         for (int i = 0; i < pt.length; i++) {
             pt[i] = clamp(pt[i] + movement[i], 0, bounds[i]);
@@ -449,19 +455,66 @@ public class RegionPacker {
         return curve.distance(pt);
     }
 
-    private void clampedDistanceExpandChebyshev(IntVLA vla, int[] pt, int[] bounds, int expansion)
+    private int clampedDistanceTranslate(int[] pt, int[] bounds, int[] movement)
     {
-        int[] move = new int[pt.length];
-        int side = expansion * 2 + 1, exp = (int)Math.pow(side, pt.length), limit;
+        int[] pt2 = new int[pt.length];
+        for (int i = 0; i < pt.length; i++) {
+            pt2[i] = clamp(pt[i] + movement[i], 0, bounds[i]);
+        }
+        return curve.distance(pt2);
+    }
 
+    private void assignExpand(IntSortedSet values, IntSet checks, int[] pt, int[] bounds, int[][] movers)
+    {
+        int temp;
+        for (int i = 0; i < movers.length; i++) {
+            temp = clampedDistanceTranslate(pt, bounds, movers[i]);
+            if (!checks.contains(temp)) {
+                values.add(temp);
+            }
+        }
+    }
+    private int[][] expandChebyshev(int expansion)
+    {
+        int[] move = new int[curve.dimensionality.length];
+        int side = expansion * 2 + 1, exp = (int)Math.pow(side, move.length), limit, run;
+        int[][] movers = new int[exp][move.length];
         for (int i = 0; i < exp; i++) {
             limit = side;
-            for (int d = 0; d < pt.length; d++) {
-                move[d] = (i % limit) - expansion;
+            run = 1;
+            for (int d = 0; d < move.length; d++) {
+                move[d] = ((i / run) % limit) - expansion;
                 limit *= side;
+                run *= side;
             }
-            vla.add(clampedDistanceTranslate(pt, bounds, move));
+            System.arraycopy(move, 0, movers[i], 0, move.length);
         }
+        return movers;
+    }
+
+    private int[][] expandManhattan(int expansion)
+    {
+        int[] move = new int[curve.dimensionality.length];
+        if(expansion < 0) expansion = 0;
+        else if(expansion > 100) expansion = 100;
+        int side = expansion * 2 + 1, cube = (int)Math.pow(side, move.length),
+                exp = 1 + 2 * move.length * manhattan_100[expansion], m = 0, limit, length, run;
+        int[][] movers = new int[exp][move.length];
+        CELL_WISE:
+        for (int i = 0; i < cube && m < exp; i++)
+        {
+            limit = side;
+            run = 1;
+            length = 0;
+            for (int d = 0; d < move.length; d++) {
+                move[d] = ((i / run) % limit) - expansion;
+                if((length += Math.abs(move[d])) > expansion) continue CELL_WISE;
+                limit *= side;
+                run *= side;
+            }
+            System.arraycopy(move, 0, movers[m++], 0, move.length);
+        }
+        return movers;
     }
     /**
      * Move all "on" positions in packed by the number of cells given in xMove and yMove, unless the move
@@ -469,7 +522,7 @@ public class RegionPacker {
      * cell is stopped at the edge (moving any shape by an xMove greater than width or yMove greater than
      * height will move all "on" cells to that edge, in a 1-cell thick line). Returns a new packed short[]
      * and does not modify packed.
-     * @param packed a short[] returned by pack() or one of the sub-arrays in what is returned by packMulti()
+     * @param packed a packed bitmap returned by pack() or a similar method
      * @param bounds the bounds of the positions to translate; bits will stop before they hit the bounds or go negative
      * @param movement an array that shound have identical length to bounds; stores movement in each dimension to apply
      * @return new packed data that encodes "on" for cells that were moved from cells that were "on" in packed
@@ -480,27 +533,27 @@ public class RegionPacker {
         {
             return ALL_WALL;
         }
-        IntVLA vla = new IntVLA(256);
-        int x, y;
+        IntSortedSet ints = new IntRBTreeSet();
         IntIterator it = packed.intIterator();
         int[] pt = new int[bounds.length];
         while (it.hasNext()) {
-            vla.add(clampedDistanceTranslate(curve.alter(pt, it.next()), bounds, movement));
+            ints.add(clampedDistanceTranslateInPlace(curve.alter(pt, it.next()), bounds, movement));
         }
-        if(vla.size < 1)
+        if(ints.size() < 1)
             return ALL_WALL;
-        vla.sort();
 
-        return EWAHCompressedBitmap32.bitmapOf(vla.toArray());
+        return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
     }
 
     /**
-     * Expand each "on" position in packed to cover a a square with side length equal to 1 + expansion * 2,
-     * centered on the original "on" position, unless the expansion would take a cell further than 0,
-     * width - 1 (for xMove) or height - 1 (for yMove), in which case that cell is stopped at the edge.
-     * Returns a new packed short[] and does not modify packed.
-     * @param packed a short[] returned by pack() or one of the sub-arrays in what is returned by packMulti()
-     * @param expansion the positive (square) radius, in cells, to expand each cell out by
+     * Expand each "on" position in packed to cover a diamond in 2D, octahedron in 3D, or cross polytope in higher
+     * dimensions, with the center of each cell and the cells with a Manhattan distance of expansion or less
+     * included, unless the expansion would take a cell further than 0 or out of the appropriate dimension in bounds, in
+     * which case that cell is stopped at the edge.
+     * Returns a new packed packed bitmap and does not modify packed.
+     * @param packed a packed bitmap returned by pack() or a similar method
+     * @param expansion the positive (square) radius, in cells, to expand each cell out by; clamped at 100
+     * @param bounds the bounds of the positions to expand; bits will stop before they hit the bounds or go negative
      * @return a packed array that encodes "on" for packed and cells that expanded from cells that were "on" in packed
      */
     public EWAHCompressedBitmap32 expand(EWAHCompressedBitmap32 packed, int expansion, int[] bounds)
@@ -509,126 +562,131 @@ public class RegionPacker {
         {
             return ALL_WALL;
         }
-        IntVLA vla = new IntVLA(256);
-        ShortSet ss = new ShortSet(256);
-        boolean on = false;
-        int idx = 0, x, y;
-        short dist;
-        for(int p = 0; p < packed.length; p++, on = !on) {
-            if (on) {
-                for (int i = idx; i < idx + (packed[p] & 0xffff); i++) {
-                    x = hilbertX[i];
-                    y = hilbertY[i];
-                    for (int j = Math.max(0, x - expansion); j <= Math.min(width - 1, x + expansion); j++) {
-                        for (int k = Math.max(0, y - expansion); k <= Math.min(height - 1, y + expansion); k++) {
-                            dist = hilbertDistances[j + (k << 8)];
-                            if (ss.add(dist))
-                                vla.add(dist);
-                        }
-                    }
-                }
-            }
-            idx += packed[p] & 0xffff;
+        int[][] movers = expandManhattan(expansion);
+        IntSortedSet ints = new IntRBTreeSet();
+        IntIterator it = packed.intIterator();
+        int[] pt = new int[bounds.length];
+        while (it.hasNext()) {
+            assignExpand(ints, ints, curve.alter(pt, it.next()), bounds, movers);
         }
 
-        int[] indices = vla.asInts();
-        if(indices.length < 1)
+        if(ints.isEmpty())
             return ALL_WALL;
-        Arrays.sort(indices);
 
-        vla = new IntVLA(128);
-        int current, past = indices[0], skip = 0;
-
-        vla.add((short)indices[0]);
-        for (int i = 1; i < indices.length; i++) {
-            current = indices[i];
-            if (current - past > 1)
-            {
-                vla.add((short) (skip+1));
-                skip = 0;
-                vla.add((short)(current - past - 1));
-            }
-            else if(current != past)
-                skip++;
-            past = current;
-        }
-        vla.add((short)(skip+1));
-        return vla.toArray();
+        return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
     }
 
 
     /**
-     * Expand each "on" position in packed to cover a a square with side length equal to 1 + expansion * 2,
-     * centered on the original "on" position, unless the expansion would take a cell further than 0,
-     * width - 1 (for xMove) or height - 1 (for yMove), in which case that cell is stopped at the edge.
-     * Returns a new packed short[] and does not modify packed.
-     * @param packed a short[] returned by pack() or one of the sub-arrays in what is returned by packMulti()
-     * @param expansion the positive (square) radius, in cells, to expand each cell out by
-     * @param width the maximum width; if a cell would move to x at least equal to width, it stops at width - 1
-     * @param height the maximum height; if a cell would move to y at least equal to height, it stops at height - 1
-     * @param eightWay true if the expansion should be both diagonal and orthogonal; false for just orthogonal
+     * Expand each "on" position in packed to cover either a square/cube/hypercube or a
+     * diamond/octahedron/cross polytope (for 2D, 3D, and higher dimensions, respectively) depending on whether the
+     * chebyshev argument is true (producing a hypercube) or false (producing a cross polytope). The center of each cell
+     * and the cells with a Chebyshev or Manhattan distance (the former if chebyshev is true) of expansion or less
+     * included, unless the expansion would take a cell further than 0 or out of the appropriate dimension in bounds, in
+     * which case that cell is stopped at the edge.
+     * Returns a new packed packed bitmap and does not modify packed.
+     * @param packed a packed bitmap returned by pack() or a similar method
+     * @param expansion the positive (square) radius, in cells, to expand each cell out by; clamped at 100 if chebyshev
+     *                  is false
+     * @param bounds the bounds of the positions to expand; bits will stop before they hit the bounds or go negative
+     * @param chebyshev true to use Chebyshev distance and expand equally in diagonal and orthogonal directions; false
+     *                  to use Manhattan distance and only expand in orthogonal directions at each step
      * @return a packed array that encodes "on" for packed and cells that expanded from cells that were "on" in packed
      */
-    public static short[] expand(short[] packed, int expansion, int width, int height, boolean eightWay)
+    public EWAHCompressedBitmap32 expand(EWAHCompressedBitmap32 packed, int expansion, int[] bounds, boolean chebyshev)
     {
-        if(eightWay)
-            return expand(packed, expansion, width, height);
-        if(packed == null || packed.length <= 1)
+        if(packed == null || packed.isEmpty())
         {
             return ALL_WALL;
         }
-        IntVLA vla = new IntVLA(256);
-        ShortSet ss = new ShortSet(256);
-        boolean on = false;
-        int idx = 0, x, y;
-        short dist;
-        int[] xOffsets = new int[]{0, 1, 0, -1, 0}, yOffsets = new int[]{1, 0, -1, 0, 1};
-        for(int p = 0; p < packed.length; p++, on = !on) {
-            if (on) {
-                for (int i = idx; i < idx + (packed[p] & 0xffff); i++) {
-                    x = hilbertX[i];
-                    y = hilbertY[i];
-                    for (int d = 0; d < 4; d++) {
-                        for (int e = 1; e <= expansion; e++) {
-                            for (int e2 = 0; e2 < expansion; e2++) {
-                                int j = Math.min(width - 1, Math.max(0, x + xOffsets[d] * e + yOffsets[d + 1] * e2));
-                                int k = Math.min(height - 1, Math.max(0, y + yOffsets[d] * e + xOffsets[d + 1] * e2));
-                                dist = hilbertDistances[j + (k << 8)];
-                                if (ss.add(dist))
-                                    vla.add(dist);
-                            }
-                        }
-                    }
-                }
-            }
-            idx += packed[p] & 0xffff;
+        int[][] movers;
+        if(chebyshev) movers = expandChebyshev(expansion);
+        else movers = expandManhattan(expansion);
+        IntSortedSet ints = new IntRBTreeSet();
+        IntIterator it = packed.intIterator();
+        int[] pt = new int[bounds.length];
+        while (it.hasNext()) {
+            assignExpand(ints, ints, curve.alter(pt, it.next()), bounds, movers);
         }
 
-        int[] indices = vla.asInts();
-        if(indices.length < 1)
+        if(ints.isEmpty())
             return ALL_WALL;
-        Arrays.sort(indices);
 
-        vla = new IntVLA(128);
-        int current, past = indices[0], skip = 0;
-
-        vla.add((short)indices[0]);
-        for (int i = 1; i < indices.length; i++) {
-            current = indices[i];
-            if (current - past > 1)
-            {
-                vla.add((short) (skip+1));
-                skip = 0;
-                vla.add((short)(current - past - 1));
-            }
-            else if(current != past)
-                skip++;
-            past = current;
-        }
-        vla.add((short)(skip+1));
-        return vla.toArray();
+        return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
     }
 
+
+    /**
+     * Finds the area around the cells encoded in packed, without including those cells. Searches the area around each
+     * "on" position in packed to cover a diamond in 2D, octahedron in 3D, or cross polytope in higher
+     * dimensions, with the cells with a Manhattan distance of expansion or less included, unless the expansion would
+     * take a cell further than 0 or out of the appropriate dimension in bounds, in which case that cell is stopped at
+     * the edge, or a cell would overlap with the cells in packed, in which case it is not included at all.
+     * Returns a new packed packed bitmap and does not modify packed.
+     * @param packed a packed bitmap returned by pack() or a similar method
+     * @param expansion the positive (square) radius, in cells, to expand each cell out by; clamped at 100
+     * @param bounds the bounds of the positions to expand; bits will stop before they hit the bounds or go negative
+     * @return a packed array that encodes "on" for cells that were pushed from the edge of packed's "on" cells
+     */
+    public EWAHCompressedBitmap32 fringe(EWAHCompressedBitmap32 packed, int expansion, int[] bounds)
+    {
+        if(packed == null || packed.isEmpty())
+        {
+            return ALL_WALL;
+        }
+        int[][] movers = expandManhattan(expansion);
+        IntSet checks = new IntOpenHashSet(packed.toArray());
+        IntSortedSet ints = new IntRBTreeSet();
+        IntIterator it = packed.intIterator();
+        int[] pt = new int[bounds.length];
+        while (it.hasNext()) {
+            assignExpand(ints, checks, curve.alter(pt, it.next()), bounds, movers);
+        }
+
+        if(ints.isEmpty())
+            return ALL_WALL;
+
+        return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
+    }
+    /**
+     * Finds the area around the cells encoded in packed, without including those cells. Searches the area around each
+     * "on" position in packed to cover either a square/cube/hypercube or a diamond/octahedron/cross polytope (for 2D,
+     * 3D, and higher dimensions, respectively) depending on whether the chebyshev argument is true (producing a
+     * hypercube) or false (producing a cross polytope). The cells with a Chebyshev or Manhattan distance (the former if
+     * chebyshev is true) of expansion or less are included, unless the expansion would take a cell further than 0 or
+     * out of the appropriate dimension in bounds, in which case that cell is stopped at the edge, or a cell would
+     * overlap with the cells in packed, in which case it is not included at all.
+     * Returns a new packed packed bitmap and does not modify packed.
+     * @param packed a packed bitmap returned by pack() or a similar method
+     * @param expansion the positive (square) radius, in cells, to expand each cell out by; clamped at 100
+     * @param bounds the bounds of the positions to expand; bits will stop before they hit the bounds or go negative
+     * @param chebyshev true to use Chebyshev distance and expand equally in diagonal and orthogonal directions; false
+     *                  to use Manhattan distance and only expand in orthogonal directions at each step
+     * @return a packed array that encodes "on" for cells that were pushed from the edge of packed's "on" cells
+     */
+    public EWAHCompressedBitmap32 fringe(EWAHCompressedBitmap32 packed, int expansion, int[] bounds, boolean chebyshev)
+    {
+        if(packed == null || packed.isEmpty())
+        {
+            return ALL_WALL;
+        }
+        int[][] movers;
+        if(chebyshev) movers = expandChebyshev(expansion);
+        else movers = expandManhattan(expansion);
+
+        IntSet checks = new IntOpenHashSet(packed.toArray());
+        IntSortedSet ints = new IntRBTreeSet();
+        IntIterator it = packed.intIterator();
+        int[] pt = new int[bounds.length];
+        while (it.hasNext()) {
+            assignExpand(ints, checks, curve.alter(pt, it.next()), bounds, movers);
+        }
+
+        if(ints.isEmpty())
+            return ALL_WALL;
+
+        return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
+    }
 
     /**
      * Finds the area around the cells encoded in packed, without including those cells. For each "on"
