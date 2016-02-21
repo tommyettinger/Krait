@@ -51,5 +51,5 @@ public interface IntIterable extends Iterable<Integer> {
 	 * Note that this specification strengthens the one given in {@link Iterable#iterator()}.
 	 *
 	 * @return a type-specific iterator. */
-	IntIterator iterator();
+	IntegerIterator iterator();
 }

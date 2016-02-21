@@ -326,7 +326,7 @@ public abstract class AbstractIntBigList extends AbstractIntCollection implement
 	 *
 	 * @return the hash code for this big list. */
 	public int hashCode() {
-		IntIterator i = iterator();
+		IntegerIterator i = iterator();
 		int h = 1;
 		long s = size64();
 		while ( s-- != 0 ) {
@@ -491,7 +491,7 @@ public abstract class AbstractIntBigList extends AbstractIntCollection implement
 
 	public String toString() {
 		final StringBuilder s = new StringBuilder();
-		final IntIterator i = iterator();
+		final IntegerIterator i = iterator();
 		long n = size64();
 		int k;
 		boolean first = true;

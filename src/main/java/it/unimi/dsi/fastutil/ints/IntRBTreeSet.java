@@ -131,7 +131,7 @@ public class IntRBTreeSet extends AbstractIntSortedSet implements java.io.Serial
 	/** Creates a new tree set using elements provided by a type-specific iterator.
 	 *
 	 * @param i a type-specific iterator whose elements will fill the set. */
-	public IntRBTreeSet( final IntIterator i ) {
+	public IntRBTreeSet( final IntegerIterator i ) {
 		while ( i.hasNext() )
 			add( i.nextInt() );
 	}

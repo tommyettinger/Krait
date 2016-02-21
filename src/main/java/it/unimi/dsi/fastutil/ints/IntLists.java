@@ -157,7 +157,7 @@ public class IntLists {
 		// SUPPRESS_WARNINGS_KEY_UNCHECKED
 		// public KEY_ITERATOR KEY_GENERIC iterator( int i ) { if ( i == 0 ) return ITERATORS.EMPTY_ITERATOR; throw new IndexOutOfBoundsException( String.valueOf( i ) ); }
 		@Deprecated
-		public IntIterator intIterator() {
+		public IntegerIterator intIterator() {
 			return IntIterators.EMPTY_ITERATOR;
 		}
 

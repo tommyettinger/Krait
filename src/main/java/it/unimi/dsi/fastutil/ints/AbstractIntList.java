@@ -319,7 +319,7 @@ public abstract class AbstractIntList extends AbstractIntCollection implements I
 	 *
 	 * @return the hash code for this list. */
 	public int hashCode() {
-		IntIterator i = iterator();
+		IntegerIterator i = iterator();
 		int h = 1, s = size();
 		while ( s-- != 0 ) {
 			int k = i.nextInt();
@@ -446,7 +446,7 @@ public abstract class AbstractIntList extends AbstractIntCollection implements I
 
 	public String toString() {
 		final StringBuilder s = new StringBuilder();
-		final IntIterator i = iterator();
+		final IntegerIterator i = iterator();
 		int n = size();
 		int k;
 		boolean first = true;

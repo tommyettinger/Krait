@@ -241,7 +241,7 @@ public class IntIterators {
 	 * @param offset the first element of the array to be returned.
 	 * @param max the maximum number of elements to unwrap.
 	 * @return the number of elements unwrapped. */
-	public static int unwrap( final IntIterator i, final int array[], int offset, final int max ) {
+	public static int unwrap(final IntegerIterator i, final int array[], int offset, final int max ) {
 		if ( max < 0 ) throw new IllegalArgumentException( "The maximum number of elements (" + max + ") is negative" );
 		if ( offset < 0 || offset + max > array.length ) throw new IllegalArgumentException();
 		int j = max;
@@ -258,7 +258,7 @@ public class IntIterators {
 	 * @param i a type-specific iterator.
 	 * @param array an array to contain the output of the iterator.
 	 * @return the number of elements unwrapped. */
-	public static int unwrap( final IntIterator i, final int array[] ) {
+	public static int unwrap(final IntegerIterator i, final int array[] ) {
 		return unwrap( i, array, 0, array.length );
 	}
 
@@ -270,7 +270,7 @@ public class IntIterators {
 	 * @param max the maximum number of elements to be unwrapped.
 	 * @return an array containing the elements returned by the iterator (at most <code>max</code>). */
 
-	public static int[] unwrap( final IntIterator i, int max ) {
+	public static int[] unwrap(final IntegerIterator i, int max ) {
 		if ( max < 0 ) throw new IllegalArgumentException( "The maximum number of elements (" + max + ") is negative" );
 		int array[] = new int[ 16 ];
 		int j = 0;
@@ -287,7 +287,7 @@ public class IntIterators {
 	 *
 	 * @param i a type-specific iterator.
 	 * @return an array containing the elements returned by the iterator. */
-	public static int[] unwrap( final IntIterator i ) {
+	public static int[] unwrap( final IntegerIterator i ) {
 		return unwrap( i, Integer.MAX_VALUE );
 	}
 
@@ -301,7 +301,7 @@ public class IntIterators {
 	 * @param max the maximum number of elements to unwrap.
 	 * @return the number of elements unwrapped. Note that this is the number of elements returned by the iterator, which is not necessarily the number of elements that have been added to the
 	 * collection (because of duplicates). */
-	public static int unwrap( final IntIterator i, final IntCollection c, final int max ) {
+	public static int unwrap(final IntegerIterator i, final IntCollection c, final int max ) {
 		if ( max < 0 ) throw new IllegalArgumentException( "The maximum number of elements (" + max + ") is negative" );
 		int j = max;
 		while ( j-- != 0 && i.hasNext() )
@@ -318,7 +318,7 @@ public class IntIterators {
 	 * @param c a type-specific collection to contain the output of the iterator.
 	 * @return the number of elements unwrapped. Note that this is the number of elements returned by the iterator, which is not necessarily the number of elements that have been added to the
 	 * collection (because of duplicates). */
-	public static long unwrap( final IntIterator i, final IntCollection c ) {
+	public static long unwrap(final IntegerIterator i, final IntCollection c ) {
 		long n = 0;
 		while ( i.hasNext() ) {
 			c.add( i.nextInt() );
@@ -336,7 +336,7 @@ public class IntIterators {
 	 * @param max the maximum number of elements to be poured.
 	 * @return the number of elements poured. Note that this is the number of elements returned by the iterator, which is not necessarily the number of elements that have been added to the collection
 	 * (because of duplicates). */
-	public static int pour( final IntIterator i, final IntCollection s, final int max ) {
+	public static int pour(final IntegerIterator i, final IntCollection s, final int max ) {
 		if ( max < 0 ) throw new IllegalArgumentException( "The maximum number of elements (" + max + ") is negative" );
 		int j = max;
 		while ( j-- != 0 && i.hasNext() )
@@ -352,7 +352,7 @@ public class IntIterators {
 	 * @param s a type-specific collection.
 	 * @return the number of elements poured. Note that this is the number of elements returned by the iterator, which is not necessarily the number of elements that have been added to the collection
 	 * (because of duplicates). */
-	public static int pour( final IntIterator i, final IntCollection s ) {
+	public static int pour(final IntegerIterator i, final IntCollection s ) {
 		return pour( i, s, Integer.MAX_VALUE );
 	}
 
@@ -365,7 +365,7 @@ public class IntIterators {
 	 * @param i a type-specific iterator.
 	 * @param max the maximum number of elements to be poured.
 	 * @return a type-specific list containing the returned elements, up to <code>max</code>. */
-	public static IntList pour( final IntIterator i, int max ) {
+	public static IntList pour(final IntegerIterator i, int max ) {
 		final IntArrayList l = new IntArrayList();
 		pour( i, l, max );
 		l.trim();
@@ -379,7 +379,7 @@ public class IntIterators {
 	 *
 	 * @param i a type-specific iterator.
 	 * @return a type-specific list containing the returned elements. */
-	public static IntList pour( final IntIterator i ) {
+	public static IntList pour( final IntegerIterator i ) {
 		return pour( i, Integer.MAX_VALUE );
 	}
 
@@ -413,8 +413,8 @@ public class IntIterators {
 	 * @param i an iterator.
 	 * @return a type-specific iterator backed by <code>i</code>. */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static IntIterator asIntIterator( final Iterator i ) {
-		if ( i instanceof IntIterator ) return (IntIterator)i;
+	public static IntegerIterator asIntIterator(final Iterator i ) {
+		if ( i instanceof IntegerIterator) return (IntegerIterator)i;
 		return new IteratorWrapper( i );
 	}
 
@@ -545,10 +545,10 @@ public class IntIterators {
 	}
 
 	private static class IteratorConcatenator extends AbstractIntIterator {
-		final IntIterator a[];
+		final IntegerIterator a[];
 		int offset, length, lastOffset = -1;
 
-		public IteratorConcatenator( final IntIterator a[], int offset, int length ) {
+		public IteratorConcatenator(final IntegerIterator a[], int offset, int length ) {
 			this.a = a;
 			this.offset = offset;
 			this.length = length;
@@ -599,7 +599,7 @@ public class IntIterators {
 	 *
 	 * @param a an array of iterators.
 	 * @return an iterator obtained by concatenation. */
-	public static IntIterator concat( final IntIterator a[] ) {
+	public static IntegerIterator concat(final IntegerIterator a[] ) {
 		return concat( a, 0, a.length );
 	}
 
@@ -612,15 +612,15 @@ public class IntIterators {
 	 * @param offset the index of the first iterator to concatenate.
 	 * @param length the number of iterators to concatenate.
 	 * @return an iterator obtained by concatenation of <code>length</code> elements of <code>a</code> starting at <code>offset</code>. */
-	public static IntIterator concat( final IntIterator a[], final int offset, final int length ) {
+	public static IntegerIterator concat(final IntegerIterator a[], final int offset, final int length ) {
 		return new IteratorConcatenator( a, offset, length );
 	}
 
 	/** An unmodifiable wrapper class for iterators. */
 	public static class UnmodifiableIterator extends AbstractIntIterator {
-		final protected IntIterator i;
+		final protected IntegerIterator i;
 
-		public UnmodifiableIterator( final IntIterator i ) {
+		public UnmodifiableIterator( final IntegerIterator i ) {
 			this.i = i;
 		}
 
@@ -646,7 +646,7 @@ public class IntIterators {
 	 *
 	 * @param i the iterator to be wrapped in an unmodifiable iterator.
 	 * @return an unmodifiable view of the specified iterator. */
-	public static IntIterator unmodifiable( final IntIterator i ) {
+	public static IntegerIterator unmodifiable(final IntegerIterator i ) {
 		return new UnmodifiableIterator( i );
 	}
 

@@ -177,7 +177,7 @@ public class IntLinkedOpenCustomHashSet extends AbstractIntSortedSet implements 
 	 * @param i a type-specific iterator whose elements will fill the set.
 	 * @param f the load factor.
 	 * @param strategy the strategy. */
-	public IntLinkedOpenCustomHashSet( final IntIterator i, final float f, final it.unimi.dsi.fastutil.ints.IntHash.Strategy strategy ) {
+	public IntLinkedOpenCustomHashSet(final IntegerIterator i, final float f, final it.unimi.dsi.fastutil.ints.IntHash.Strategy strategy ) {
 		this( DEFAULT_INITIAL_SIZE, f, strategy );
 		while ( i.hasNext() )
 			add( i.nextInt() );
@@ -187,7 +187,7 @@ public class IntLinkedOpenCustomHashSet extends AbstractIntSortedSet implements 
 	 *
 	 * @param i a type-specific iterator whose elements will fill the set.
 	 * @param strategy the strategy. */
-	public IntLinkedOpenCustomHashSet( final IntIterator i, final it.unimi.dsi.fastutil.ints.IntHash.Strategy strategy ) {
+	public IntLinkedOpenCustomHashSet(final IntegerIterator i, final it.unimi.dsi.fastutil.ints.IntHash.Strategy strategy ) {
 		this( i, DEFAULT_LOAD_FACTOR, strategy );
 	}
 
@@ -999,7 +999,7 @@ public class IntLinkedOpenCustomHashSet extends AbstractIntSortedSet implements 
 	}
 
 	private void writeObject( java.io.ObjectOutputStream s ) throws java.io.IOException {
-		final IntIterator i = iterator();
+		final IntegerIterator i = iterator();
 		s.defaultWriteObject();
 		for ( int j = size; j-- != 0; )
 			s.writeInt( i.nextInt() );

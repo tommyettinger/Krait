@@ -107,7 +107,7 @@ public class IntArraySet extends AbstractIntSet implements java.io.Serializable,
 	}
 
 	@Override
-	public IntIterator iterator() {
+	public IntegerIterator iterator() {
 		return IntIterators.wrap( a, 0, size );
 	}
 

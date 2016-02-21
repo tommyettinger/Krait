@@ -93,7 +93,7 @@ public class IntBigArrayBigList extends AbstractIntBigList implements RandomAcce
 	 * @param c a type-specific collection that will be used to fill the array list. */
 	public IntBigArrayBigList( final IntCollection c ) {
 		this( c.size() );
-		for ( IntIterator i = c.iterator(); i.hasNext(); )
+		for (IntegerIterator i = c.iterator(); i.hasNext(); )
 			add( i.nextInt() );
 	}
 
@@ -141,7 +141,7 @@ public class IntBigArrayBigList extends AbstractIntBigList implements RandomAcce
 	/** Creates a new big-array big list and fills it with the elements returned by a type-specific iterator..
 	 *
 	 * @param i a type-specific iterator whose returned elements will fill the array list. */
-	public IntBigArrayBigList( final IntIterator i ) {
+	public IntBigArrayBigList( final IntegerIterator i ) {
 		this();
 		while ( i.hasNext() )
 			this.add( i.nextInt() );

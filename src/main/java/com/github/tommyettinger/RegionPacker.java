@@ -192,19 +192,8 @@ public class RegionPacker {
         }
         return point;
     }
-
-    /**
-     * Compresses a boolean array of data encoded so the lowest-index dimensions are the most significant, using the
-     * specified bounds to determine the conversion from n-dimensional to 1-dimensional, returning a compressed bitmap
-     * from the JavaEWAH library, EWAHCompressedBitmap32.
-     *
-     * @param data a boolean array that is encodes so .
-     * @return a packed short[] that should, in most circumstances, be passed to unpack() when it needs to be used.
-     */
-    public EWAHCompressedBitmap32 pack(boolean[] data, int[] bounds)
+    private int validateBounds(int[] bounds)
     {
-        if(data == null || data.length == 0)
-            throw new ArrayIndexOutOfBoundsException("RegionPacker.pack() must be given a non-empty array");
         if(bounds == null || curve.dimensionality.length != bounds.length)
             throw new UnsupportedOperationException("Invalid bounds; should be an array with " +
                     curve.dimensionality.length + " elements");
@@ -217,6 +206,22 @@ public class RegionPacker {
         }
         if(b > 1L << 30)
             throw new UnsupportedOperationException("Bounds are too big!");
+
+        return (int)b;
+    }
+    /**
+     * Compresses a boolean array of data encoded so the lowest-index dimensions are the most significant, using the
+     * specified bounds to determine the conversion from n-dimensional to 1-dimensional, returning a compressed bitmap
+     * from the JavaEWAH library, EWAHCompressedBitmap32.
+     *
+     * @param data a boolean array that is encodes so .
+     * @return a packed short[] that should, in most circumstances, be passed to unpack() when it needs to be used.
+     */
+    public EWAHCompressedBitmap32 pack(boolean[] data, int[] bounds)
+    {
+        if(data == null || data.length == 0)
+            throw new ArrayIndexOutOfBoundsException("RegionPacker.pack() must be given a non-empty array");
+        validateBounds(bounds);
 
         EWAHCompressedBitmap32 packing = new EWAHCompressedBitmap32();
         int[] pt = new int[bounds.length];
@@ -247,21 +252,10 @@ public class RegionPacker {
     {
         if(packed == null)
             throw new ArrayIndexOutOfBoundsException("RegionPacker.unpack() must be given a non-null Region");
-        if(bounds == null || bounds.length != curve.dimensionality.length)
-            throw new UnsupportedOperationException("Invalid bounds; should be an array with " +
-                    curve.dimensionality.length + " elements");
-        long b = 1;
-        for (int i = 0; i < bounds.length; i++) {
-            if(bounds[i] > curve.dimensionality[i])
-                throw new UnsupportedOperationException("Bound size at dimension " + i
-                        + " is too large for given CurveStrategy, should be no more than " + curve.dimensionality[i]);
-            b *= bounds[i];
-        }
-        if(b > 1L << 30)
-            throw new UnsupportedOperationException("Bounds are too big!");
 
+        int b = validateBounds(bounds);
 
-        final boolean[] unpacked = new boolean[(int)b];
+        final boolean[] unpacked = new boolean[b];
 
         if(packed.isEmpty())
             return unpacked;
@@ -386,7 +380,7 @@ public class RegionPacker {
      * @param coordinates a vararg or array of coordinates; should have length equal to curve dimensions
      * @return true if the packed data stores true at the given x,y location, or false in any other case.
      */
-    public boolean queryPacked(EWAHCompressedBitmap32 packed, int... coordinates)
+    public boolean query(EWAHCompressedBitmap32 packed, int... coordinates)
     {
         int hilbertDistance = curve.distance(coordinates), total = 0;
         if(hilbertDistance < 0)
@@ -395,17 +389,13 @@ public class RegionPacker {
     }
 
     /**
-     * Quickly determines if a Hilbert Curve index corresponds to true or false in the given packed data, without
+     * Quickly determines if a space-filling curve index corresponds to true or false in the given packed data, without
      * unpacking it.
-     * <br>
-     * Typically this method will not be needed by library-consuming code unless that code deals with Hilbert Curves in
-     * a frequent and deeply involved manner. It does have the potential to avoid converting to and from x,y coordinates
-     * and Hilbert Curve indices unnecessarily, which could matter for high-performance code.
      * @param packed a packed bitmap returned by pack() or a related method; must not be null.
-     * @param hilbert a Hilbert Curve index, such as one taken directly from packed data without extra processing
-     * @return true if the packed data stores true at the given Hilbert Curve index, or false in any other case.
+     * @param hilbert a space-filling curve index, such as one taken directly from packed data without extra processing
+     * @return true if the packed data stores true at the given space-filling curve index, or false in any other case.
      */
-    public boolean queryPackedHilbert(EWAHCompressedBitmap32 packed, int hilbert)
+    public boolean queryCurve(EWAHCompressedBitmap32 packed, int hilbert)
     {
         if(hilbert < 0 || hilbert >= curve.maxDistance)
             return false;
@@ -415,10 +405,10 @@ public class RegionPacker {
     /**
      * Gets all positions that are "on" in the given packed array, without unpacking it, and returns them as a Coord[].
      * @param packed a packed bitmap returned by pack() or a similar method
-     * @return an array of int arrays representing points, ordered by distance for those points along the Hilbert Curve,
-     * corresponding to all "on" cells in packed.
+     * @return an array of int arrays representing points, ordered by distance for those points along the space-filling
+     * curve, corresponding to all "on" cells in packed.
      */
-    public int[][] allPacked(EWAHCompressedBitmap32 packed)
+    public int[][] positions(EWAHCompressedBitmap32 packed)
     {
         int[][] cs = new int[packed.cardinality()][curve.dimensionality.length];
         IntIterator it = packed.intIterator();
@@ -429,15 +419,11 @@ public class RegionPacker {
     }
     /**
      * Gets all positions that are "on" in the given packed array, without unpacking it, and returns them as an array of
-     * Hilbert Curve indices.
-     * <br>
-     * Typically this method will not be needed by library-consuming code unless that code deals with Hilbert Curves in
-     * a frequent and deeply involved manner. It does have the potential to avoid converting to and from x,y coordinates
-     * and Hilbert Curve indices unnecessarily, which could matter for high-performance code.
+     * space-filling curve indices.
      * @param packed a packed bitmap returned by pack() or a similar method
-     * @return a Hilbert Curve index array, in ascending distance order, corresponding to all "on" cells in packed.
+     * @return a space-filling crve index array, in ascending distance order, corresponding to all "on" cells in packed.
      */
-    public int[] allPackedHilbert(EWAHCompressedBitmap32 packed)
+    public int[] positionsCurve(EWAHCompressedBitmap32 packed)
     {
         return packed.toArray();
     }
@@ -464,13 +450,32 @@ public class RegionPacker {
         return curve.distance(pt2);
     }
 
+    private void assignExpand(IntSortedSet values, int[] pt, int[] bounds, int[][] movers)
+    {
+        for (int i = 0; i < movers.length; i++) {
+            values.add(clampedDistanceTranslate(pt, bounds, movers[i]));
+        }
+    }
+
     private void assignExpand(IntSortedSet values, IntSet checks, int[] pt, int[] bounds, int[][] movers)
     {
         int temp;
         for (int i = 0; i < movers.length; i++) {
             temp = clampedDistanceTranslate(pt, bounds, movers[i]);
-            if (!checks.contains(temp)) {
+            if (checks.add(temp)) {
                 values.add(temp);
+            }
+        }
+    }
+
+    private void assignFlood(IntSortedSet values, IntSet checks, IntSet edge, IntSet needs, int[] pt, int[] bounds, int[][] movers)
+    {
+        int temp;
+        for (int i = 0; i < movers.length; i++) {
+            temp = clampedDistanceTranslate(pt, bounds, movers[i]);
+            if (needs.contains(temp) && checks.add(temp)) {
+                values.add(temp);
+                edge.add(temp);
             }
         }
     }
@@ -524,7 +529,7 @@ public class RegionPacker {
      * and does not modify packed.
      * @param packed a packed bitmap returned by pack() or a similar method
      * @param bounds the bounds of the positions to translate; bits will stop before they hit the bounds or go negative
-     * @param movement an array that shound have identical length to bounds; stores movement in each dimension to apply
+     * @param movement an array that should have identical length to bounds; stores movement in each dimension to apply
      * @return new packed data that encodes "on" for cells that were moved from cells that were "on" in packed
      */
     public EWAHCompressedBitmap32 translate(EWAHCompressedBitmap32 packed, int[] bounds, int[] movement)
@@ -550,11 +555,11 @@ public class RegionPacker {
      * dimensions, with the center of each cell and the cells with a Manhattan distance of expansion or less
      * included, unless the expansion would take a cell further than 0 or out of the appropriate dimension in bounds, in
      * which case that cell is stopped at the edge.
-     * Returns a new packed packed bitmap and does not modify packed.
+     * Returns a new packed bitmap and does not modify packed.
      * @param packed a packed bitmap returned by pack() or a similar method
-     * @param expansion the positive (square) radius, in cells, to expand each cell out by; clamped at 100
+     * @param expansion the positive (diamond) radius, in cells, to expand each cell out by; clamped at 100
      * @param bounds the bounds of the positions to expand; bits will stop before they hit the bounds or go negative
-     * @return a packed array that encodes "on" for packed and cells that expanded from cells that were "on" in packed
+     * @return a packed bitmap that encodes "on" for packed and cells that expanded from cells that were "on" in packed
      */
     public EWAHCompressedBitmap32 expand(EWAHCompressedBitmap32 packed, int expansion, int[] bounds)
     {
@@ -567,7 +572,7 @@ public class RegionPacker {
         IntIterator it = packed.intIterator();
         int[] pt = new int[bounds.length];
         while (it.hasNext()) {
-            assignExpand(ints, ints, curve.alter(pt, it.next()), bounds, movers);
+            assignExpand(ints, curve.alter(pt, it.next()), bounds, movers);
         }
 
         if(ints.isEmpty())
@@ -584,14 +589,14 @@ public class RegionPacker {
      * and the cells with a Chebyshev or Manhattan distance (the former if chebyshev is true) of expansion or less
      * included, unless the expansion would take a cell further than 0 or out of the appropriate dimension in bounds, in
      * which case that cell is stopped at the edge.
-     * Returns a new packed packed bitmap and does not modify packed.
+     * Returns a new packed bitmap and does not modify packed.
      * @param packed a packed bitmap returned by pack() or a similar method
-     * @param expansion the positive (square) radius, in cells, to expand each cell out by; clamped at 100 if chebyshev
-     *                  is false
+     * @param expansion the positive (square or diamond) radius, in cells, to expand each cell out by; clamped at 100 if
+     *                  chebyshev is false
      * @param bounds the bounds of the positions to expand; bits will stop before they hit the bounds or go negative
      * @param chebyshev true to use Chebyshev distance and expand equally in diagonal and orthogonal directions; false
      *                  to use Manhattan distance and only expand in orthogonal directions at each step
-     * @return a packed array that encodes "on" for packed and cells that expanded from cells that were "on" in packed
+     * @return a packed bitmap that encodes "on" for packed and cells that expanded from cells that were "on" in packed
      */
     public EWAHCompressedBitmap32 expand(EWAHCompressedBitmap32 packed, int expansion, int[] bounds, boolean chebyshev)
     {
@@ -606,7 +611,7 @@ public class RegionPacker {
         IntIterator it = packed.intIterator();
         int[] pt = new int[bounds.length];
         while (it.hasNext()) {
-            assignExpand(ints, ints, curve.alter(pt, it.next()), bounds, movers);
+            assignExpand(ints, curve.alter(pt, it.next()), bounds, movers);
         }
 
         if(ints.isEmpty())
@@ -622,11 +627,11 @@ public class RegionPacker {
      * dimensions, with the cells with a Manhattan distance of expansion or less included, unless the expansion would
      * take a cell further than 0 or out of the appropriate dimension in bounds, in which case that cell is stopped at
      * the edge, or a cell would overlap with the cells in packed, in which case it is not included at all.
-     * Returns a new packed packed bitmap and does not modify packed.
+     * Returns a new packed bitmap and does not modify packed.
      * @param packed a packed bitmap returned by pack() or a similar method
-     * @param expansion the positive (square) radius, in cells, to expand each cell out by; clamped at 100
+     * @param expansion the positive (diamond) radius, in cells, to push each cell out by; clamped at 100
      * @param bounds the bounds of the positions to expand; bits will stop before they hit the bounds or go negative
-     * @return a packed array that encodes "on" for cells that were pushed from the edge of packed's "on" cells
+     * @return a packed bitmap that encodes "on" for cells that were pushed from the edge of packed's "on" cells
      */
     public EWAHCompressedBitmap32 fringe(EWAHCompressedBitmap32 packed, int expansion, int[] bounds)
     {
@@ -656,13 +661,14 @@ public class RegionPacker {
      * chebyshev is true) of expansion or less are included, unless the expansion would take a cell further than 0 or
      * out of the appropriate dimension in bounds, in which case that cell is stopped at the edge, or a cell would
      * overlap with the cells in packed, in which case it is not included at all.
-     * Returns a new packed packed bitmap and does not modify packed.
+     * Returns a new packed bitmap and does not modify packed.
      * @param packed a packed bitmap returned by pack() or a similar method
-     * @param expansion the positive (square) radius, in cells, to expand each cell out by; clamped at 100
+     * @param expansion the positive (square or diamond) radius, in cells, to push each cell out by; clamped at 100 if
+     *                  chebyshev is false
      * @param bounds the bounds of the positions to expand; bits will stop before they hit the bounds or go negative
      * @param chebyshev true to use Chebyshev distance and expand equally in diagonal and orthogonal directions; false
      *                  to use Manhattan distance and only expand in orthogonal directions at each step
-     * @return a packed array that encodes "on" for cells that were pushed from the edge of packed's "on" cells
+     * @return a packed bitmap that encodes "on" for cells that were pushed from the edge of packed's "on" cells
      */
     public EWAHCompressedBitmap32 fringe(EWAHCompressedBitmap32 packed, int expansion, int[] bounds, boolean chebyshev)
     {
@@ -688,728 +694,239 @@ public class RegionPacker {
         return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
     }
 
+
     /**
-     * Finds the area around the cells encoded in packed, without including those cells. For each "on"
-     * position in packed, expand it to cover a a square with side length equal to 1 + expansion * 2,
-     * centered on the original "on" position, unless the expansion would take a cell further than 0,
-     * width - 1 (for xMove) or height - 1 (for yMove), in which case that cell is stopped at the edge.
-     * If a cell is "on" in packed, it will always be "off" in the result.
-     * Returns a new packed short[] and does not modify packed.
-     * @param packed a short[] returned by pack() or one of the sub-arrays in what is returned by packMulti()
-     * @param expansion the positive (square-shaped) radius, in cells, to expand each cell out by
-     * @param width the maximum width; if a cell would move to x at least equal to width, it stops at width - 1
-     * @param height the maximum height; if a cell would move to y at least equal to height, it stops at height - 1
-     * @return a packed array that encodes "on" for cells that were pushed from the edge of packed's "on" cells
+     * Finds the concentric areas around the cells encoded in packed, without including those cells. Searches the area
+     * around each "on" position in packed to cover a diamond in 2D, octahedron in 3D, or cross polytope in higher
+     * dimensions, with the cells with a Manhattan distance of 1 included in the first element of the returned array of
+     * packed bitmaps, the cells with a Manhattan distance of 2 in the second element of that array (and not cells at
+     * any other distance), and so on up to a distance equal to expansion. If a cell in a packed bitmap would overlap
+     * with the cells in packed or has already been included in an earlier packed bitmap in the returned array, it is
+     * not added to a packed bitmap. If the expansion would take a cell further than 0 or out of the appropriate
+     * dimension in bounds, that cell is technically stopped at the edge, but in all cases it will have been included in
+     * an earlier fringe or in packed itself, so those cells won't be included anyway.
+     * Returns an array of new packed bitmaps and does not modify packed.
+     * @param packed a packed bitmap returned by pack() or a similar method
+     * @param expansion the positive (diamond) radius, in cells, to push the furthest cells out by; clamped at 100
+     * @param bounds the bounds of the positions to expand; bits will stop before they hit the bounds or go negative
+     * @return an array of packed bitmaps, with length equal to expansion, where each bitmap encodes "on" for cells that
+     * have a Manhattan distance to the nearest "on" cell in packed equal to the index in the array plus 1.
      */
-    public static short[] fringe(short[] packed, int expansion, int width, int height)
+    public EWAHCompressedBitmap32[] fringes(EWAHCompressedBitmap32 packed, int expansion, int[] bounds)
     {
-        if(packed == null || packed.length <= 1)
+        EWAHCompressedBitmap32[] values = new EWAHCompressedBitmap32[expansion];
+        if(packed == null || packed.isEmpty())
+        {
+            Arrays.fill(values, ALL_WALL);
+            return values;
+        }
+        IntSet checks = new IntOpenHashSet(packed.toArray());
+        IntSortedSet ints;
+        for (int i = 1; i <= expansion; i++) {
+            int[][] movers = expandManhattan(i);
+            ints = new IntRBTreeSet();
+            IntIterator it = packed.intIterator();
+            int[] pt = new int[bounds.length];
+            while (it.hasNext()) {
+                assignExpand(ints, checks, curve.alter(pt, it.next()), bounds, movers);
+            }
+
+            if(ints.isEmpty())
+                values[i - 1] = ALL_WALL;
+            else
+                values[i - 1] = EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
+        }
+
+        return values;
+    }
+    /**
+     * Finds the concentric areas around the cells encoded in packed, without including those cells. Searches the area
+     * around each "on" position in packed to cover either a square/cube/hypercube or a diamond/octahedron/cross
+     * polytope (for 2D, 3D, and higher dimensions, respectively) depending on whether the chebyshev argument is true
+     * (producing a hypercube) or false (producing a cross polytope). The distance measurement is Chebyshev or Manhattan
+     * distance, the former if chebyshev is true. Cells with a distance of 1 are included in the first element of the
+     * returned array of packed bitmaps, cells with a distance of 2 are included in the second element of that array
+     * (and not cells at any other distance), and so on up to a distance equal to expansion. If a cell in a packed
+     * bitmap would overlap with the cells in packed or has already been included in an earlier packed bitmap in the
+     * returned array, it is not added to a packed bitmap. If the expansion would take a cell further than 0 or out of
+     * the appropriate dimension in bounds, that cell is technically stopped at the edge, but in all cases it will have
+     * been included in an earlier fringe or in packed itself, so those cells won't be included anyway.
+     * Returns an array of new packed bitmaps and does not modify packed.
+     * @param packed a packed bitmap returned by pack() or a similar method
+     * @param expansion the positive (square or diamond) radius, in cells, to push the furthest cell out by; clamped at 100
+     *                  if chebyshev is false
+     * @param bounds the bounds of the positions to expand; bits will stop before they hit the bounds or go negative
+     * @param chebyshev true to use Chebyshev distance and expand equally in diagonal and orthogonal directions; false
+     *                  to use Manhattan distance and only expand in orthogonal directions at each step
+     * @return an array of packed bitmaps, with length equal to expansion, where each bitmap encodes "on" for cells that
+     * have a Manhattan or Chebyshev distance to the nearest "on" cell in packed equal to the index in the array plus 1.
+     */
+    public EWAHCompressedBitmap32[] fringes(EWAHCompressedBitmap32 packed, int expansion, int[] bounds, boolean chebyshev)
+    {
+        EWAHCompressedBitmap32[] values = new EWAHCompressedBitmap32[expansion];
+        if(packed == null || packed.isEmpty())
+        {
+            Arrays.fill(values, ALL_WALL);
+            return values;
+        }
+        IntSet checks = new IntOpenHashSet(packed.toArray());
+        IntSortedSet ints;
+        int[][] movers;
+        for (int i = 1; i <= expansion; i++) {
+            if(chebyshev) movers = expandChebyshev(i);
+            else movers = expandManhattan(i);
+            ints = new IntRBTreeSet();
+            IntIterator it = packed.intIterator();
+            int[] pt = new int[bounds.length];
+            while (it.hasNext()) {
+                assignExpand(ints, checks, curve.alter(pt, it.next()), bounds, movers);
+            }
+
+            if(ints.isEmpty())
+                values[i - 1] = ALL_WALL;
+            else
+                values[i - 1] = EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
+        }
+
+        return values;
+    }
+
+    /**
+     * Given the packed data start and container, where start encodes some area to expand out from and container encodes
+     * the (typically irregularly shaped) region of viable positions that can be filled, a bounds array storing maximum
+     * height/width/etc. and an amount to expand outward by, expands each cell in start by a Manhattan (diamond) radius
+     * equal to expansion, limiting any expansion to within container and bounds and returning the final expanded
+     * (limited) packed data. Because this goes in 1-distance steps of expansion, and this won't expand into any areas
+     * not present in container, any gaps in container will take more steps to move around than a normal expansion would
+     * moving through. This can be useful for a number of effects where contiguous movement needs to be modeled.
+     * Returns a new packed bitmap and does not modify start or container.
+     * @param start a packed bitmap returned by pack() or a similar method that stores the start points of the flood
+     * @param container a packed bitmap that represents all viable cells that this is allowed to flood into
+     * @param expansion the positive (diamond) radius, in cells, to push the furthest cells out by; clamped at 100
+     * @param bounds the bounds of the positions to expand; bits will stop before they hit the bounds or go negative
+     * @return a packed bitmap that does not extend beyond container and encodes the stepwise flood out from start by
+     * a number of steps equal to expansion.
+     */
+    public EWAHCompressedBitmap32 flood(EWAHCompressedBitmap32 start, EWAHCompressedBitmap32 container,
+                                        int expansion, int[] bounds)
+    {
+        if(start == null || start.isEmpty() || container == null || container.isEmpty())
         {
             return ALL_WALL;
         }
-        IntVLA vla = new IntVLA(256);
-        ShortSet ss = new ShortSet(256);
-        boolean on = false;
-        int idx = 0;
-        short x, y, dist;
-        for(int p = 0; p < packed.length; p++, on = !on) {
-            if (on) {
-                for (int i = idx; i < idx + (packed[p] & 0xffff); i++) {
-                    ss.add((short) i);
-                }
-            }
-            idx += packed[p] & 0xffff;
-        }
-        on = false;
-        idx = 0;
-        for(int p = 0; p < packed.length; p++, on = !on) {
-            if (on) {
-                for (int i = idx; i < idx + (packed[p] & 0xffff); i++) {
-                    x = hilbertX[i];
-                    y = hilbertY[i];
-                    for (int j = Math.max(0, x - expansion); j <= Math.min(width - 1, x + expansion); j++) {
-                        for (int k = Math.max(0, y - expansion); k <= Math.min(height - 1, y + expansion); k++) {
-                            dist = hilbertDistances[j + (k << 8)];
-                            if (ss.add(dist))
-                                vla.add(dist);
-                        }
-                    }
-                }
-            }
-            idx += packed[p] & 0xffff;
-        }
-        int[] indices = vla.asInts();
-        if(indices.length < 1)
-            return ALL_WALL;
-        Arrays.sort(indices);
+        IntSet checks = new IntOpenHashSet(), edge = new IntOpenHashSet(), start2 = new IntOpenHashSet(start.toArray()),
+                surround = new IntOpenHashSet(container.toArray());
+        IntSortedSet ints = new IntRBTreeSet();
+        int[][] movers = expandManhattan(1);
 
-        vla = new IntVLA(128);
-        int current, past = indices[0], skip = 0;
-
-        vla.add((short)indices[0]);
-        for (int i = 1; i < indices.length; i++) {
-            current = indices[i];
-            if (current - past > 1)
-            {
-                vla.add((short) (skip+1));
-                skip = 0;
-                vla.add((short)(current - past - 1));
+        for (int i = 1; i <= expansion; i++) {
+            IntegerIterator it = start2.iterator();
+            int[] pt = new int[bounds.length];
+            while (it.hasNext()) {
+                assignFlood(ints, checks, edge, surround, curve.alter(pt, it.nextInt()), bounds, movers);
             }
-            else if(current != past)
-                skip++;
-            past = current;
-        }
-        vla.add((short)(skip+1));
 
-        return vla.toArray();
+            if(edge.isEmpty())
+                break;
+            else {
+                start2.clear();
+                start2.addAll(edge);
+            }
+        }
+
+        return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
     }
 
     /**
-     * Finds the area around the cells encoded in packed, without including those cells. For each "on"
-     * position in packed, expand it to cover a a square with side length equal to 1 + expansion * 2,
-     * centered on the original "on" position, unless the expansion would take a cell further than 0,
-     * width - 1 (for xMove) or height - 1 (for yMove), in which case that cell is stopped at the edge.
-     * If a cell is "on" in packed, it will always be "off" in the result.
-     * Returns a new packed short[] and does not modify packed.
-     * @param packed a short[] returned by pack() or one of the sub-arrays in what is returned by packMulti()
-     * @param expansion the positive (square-shaped) radius, in cells, to expand each cell out by
-     * @param width the maximum width; if a cell would move to x at least equal to width, it stops at width - 1
-     * @param height the maximum height; if a cell would move to y at least equal to height, it stops at height - 1
-     * @param eightWay true if the expansion should be both diagonal and orthogonal; false for just orthogonal
-     * @return a packed array that encodes "on" for cells that were pushed from the edge of packed's "on" cells
+     * Given the packed data start and container, where start encodes some area to expand out from and container encodes
+     * the (typically irregularly shaped) region of viable positions that can be filled, a bounds array storing maximum
+     * height/width/etc. an amount to expand outward by, and a distance metric (Chebyshev or Manhattan distance, the
+     * former if chebyshev is true.), expands each cell in start by a radius using the specified distance metric equal
+     * to expansion, limiting any expansion to within container and bounds and returning the final expanded (limited)
+     * packed data. Because this goes in 1-distance steps of expansion, and this won't expand into any areas not present
+     * in container, any gaps in container will take more steps to move around than a normal expansion would moving
+     * through. This can be useful for a number of effects where contiguous movement needs to be modeled.
+     * Returns a new packed bitmap and does not modify start or container.
+     * @param start a packed bitmap returned by pack() or a similar method that stores the start points of the flood
+     * @param container a packed bitmap that represents all viable cells that this is allowed to flood into
+     * @param expansion the positive (square or diamond) radius, in cells, to push the furthest cells out by; clamped at
+     *                  100 if chebyshev is false
+     * @param bounds the bounds of the positions to expand; bits will stop before they hit the bounds or go negative
+     * @param chebyshev true to use Chebyshev distance and expand equally in diagonal and orthogonal directions; false
+     *                  to use Manhattan distance and only expand in orthogonal directions at each step
+     * @return a packed bitmap that does not extend beyond container and encodes the stepwise flood out from start by
+     * a number of steps equal to expansion.
      */
-    public static short[] fringe(short[] packed, int expansion, int width, int height, boolean eightWay)
+    public EWAHCompressedBitmap32 flood(EWAHCompressedBitmap32 start, EWAHCompressedBitmap32 container,
+                                        int expansion, int[] bounds, boolean chebyshev)
     {
-        if(eightWay)
-            return fringe(packed, expansion, width, height);
-        if(packed == null || packed.length <= 1)
+        if(start == null || start.isEmpty() || container == null || container.isEmpty())
         {
             return ALL_WALL;
         }
-        IntVLA vla = new IntVLA(256);
-        ShortSet ss = new ShortSet(256);
-        boolean on = false;
-        int idx = 0;
-        short x, y, dist;
-        int[] xOffsets = new int[]{0, 1, 0, -1, 0}, yOffsets = new int[]{1, 0, -1, 0, 1};
-        for(int p = 0; p < packed.length; p++, on = !on) {
-            if (on) {
-                for (int i = idx; i < idx + (packed[p] & 0xffff); i++) {
-                    ss.add((short) i);
-                }
+        IntSet checks = new IntOpenHashSet(), edge = new IntOpenHashSet(), start2 = new IntOpenHashSet(start.toArray()),
+                surround = new IntOpenHashSet(container.toArray());
+        IntSortedSet ints = new IntRBTreeSet();
+        int[][] movers;
+        if(chebyshev) movers = expandChebyshev(1);
+        else movers = expandManhattan(1);
+
+        for (int i = 1; i <= expansion; i++) {
+            IntegerIterator it = start2.iterator();
+            int[] pt = new int[bounds.length];
+            while (it.hasNext()) {
+                assignFlood(ints, checks, edge, surround, curve.alter(pt, it.nextInt()), bounds, movers);
             }
-            idx += packed[p] & 0xffff;
+
+            if(edge.isEmpty())
+                break;
+            else {
+                start2.clear();
+                start2.addAll(edge);
+            }
         }
-        on = false;
-        idx = 0;
-        for(int p = 0; p < packed.length; p++, on = !on) {
-            if (on) {
-                for (int i = idx; i < idx + (packed[p] & 0xffff); i++) {
-                    x = hilbertX[i];
-                    y = hilbertY[i];
-                    for (int d = 0; d < 4; d++) {
-                        for (int e = 1; e <= expansion; e++) {
-                            for (int e2 = 0; e2 < expansion; e2++) {
-                                int j = Math.min(width - 1, Math.max(0, x + xOffsets[d] * e + yOffsets[d + 1] * e2));
-                                int k = Math.min(height - 1, Math.max(0, y + yOffsets[d] * e + xOffsets[d + 1] * e2));
-                                dist = hilbertDistances[j + (k << 8)];
-                                if (ss.add(dist))
-                                    vla.add(dist);
-                            }
-                        }
-                    }
 
-                }
-            }
-            idx += packed[p] & 0xffff;
-        }
-        int[] indices = vla.asInts();
-        if(indices.length < 1)
-            return ALL_WALL;
-        Arrays.sort(indices);
-
-        vla = new IntVLA(128);
-        int current, past = indices[0], skip = 0;
-
-        vla.add((short)indices[0]);
-        for (int i = 1; i < indices.length; i++) {
-            current = indices[i];
-            if (current - past > 1)
-            {
-                vla.add((short) (skip+1));
-                skip = 0;
-                vla.add((short)(current - past - 1));
-            }
-            else if(current != past)
-                skip++;
-            past = current;
-        }
-        vla.add((short)(skip+1));
-
-        return vla.toArray();
-    }
-
-    /**
-     * Finds the concentric areas around the cells encoded in packed, without including those cells. For each "on"
-     * position in packed, expand it to cover a a square with side length equal to 1 + n * 2, where n starts at 1 and
-     * goes up to include the expansions parameter, with each expansion centered on the original "on" position, unless
-     * the expansion would take a cell further than 0, width - 1 (for xMove) or height - 1 (for yMove), in which case
-     * that cell is stopped at the edge. If a cell is "on" in packed, it will always be "off" in the results.
-     * Returns a new packed short[][] where the outer array has length equal to expansions and the inner arrays are
-     * packed data encoding a one-cell-wide concentric fringe region. Does not modify packed.
-     * @param packed a short[] returned by pack() or one of the sub-arrays in what is returned by packMulti()
-     * @param expansions the positive (square-shaped) radius, in cells, to expand each cell out by, also the length
-     *                   of the outer array returned by this method
-     * @param width the maximum width; if a cell would move to x at least equal to width, it stops at width - 1
-     * @param height the maximum height; if a cell would move to y at least equal to height, it stops at height - 1
-     * @return an array of packed arrays that encode "on" for cells that were pushed from the edge of packed's "on"
-     *          cells; the outer array will have length equal to expansions, and inner arrays will normal packed data
-     */
-    public static short[][] fringes(short[] packed, int expansions, int width, int height) {
-        short[][] finished = new short[expansions][];
-        if (packed == null || packed.length <= 1) {
-            Arrays.fill(finished, ALL_WALL);
-            return finished;
-        }
-        ShortSet ss = new ShortSet(256);
-        boolean on = false;
-        int idx = 0;
-        short x, y, dist;
-        for (int p = 0; p < packed.length; p++, on = !on) {
-            if (on) {
-                for (int i = idx; i < idx + (packed[p] & 0xffff); i++) {
-                    ss.add((short) i);
-                }
-            }
-            idx += packed[p] & 0xffff;
-        }
-        for (int expansion = 1; expansion <= expansions; expansion++) {
-            IntVLA vla = new IntVLA(256);
-            on = false;
-            idx = 0;
-            for (int p = 0; p < packed.length; p++, on = !on) {
-                if (on) {
-                    for (int i = idx; i < idx + (packed[p] & 0xffff); i++) {
-                        x = hilbertX[i];
-                        y = hilbertY[i];
-                        for (int j = Math.max(0, x - expansion); j <= Math.min(width - 1, x + expansion); j++) {
-                            for (int k = Math.max(0, y - expansion); k <= Math.min(height - 1, y + expansion); k++) {
-                                dist = hilbertDistances[j + (k << 8)];
-                                if (ss.add(dist))
-                                    vla.add(dist);
-                            }
-                        }
-                    }
-                }
-                idx += packed[p] & 0xffff;
-            }
-            int[] indices = vla.asInts();
-            if(indices.length < 1)
-            {
-                finished[expansion - 1] = ALL_WALL;
-                continue;
-            }
-            Arrays.sort(indices);
-
-            vla = new IntVLA(128);
-            int current, past = indices[0], skip = 0;
-
-            vla.add((short) indices[0]);
-            for (int i = 1; i < indices.length; i++) {
-                current = indices[i];
-
-                if (current != past)
-                    skip++;
-                if (current - past > 1) {
-                    vla.add((short) (skip + 1));
-                    skip = 0;
-                    vla.add((short) (current - past - 1));
-                }
-                past = current;
-            }
-            vla.add((short) (skip + 1));
-
-            finished[expansion-1] = vla.toArray();
-        }
-        return finished;
+        return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
     }
 
 
     /**
-     * Finds the concentric areas around the cells encoded in packed, without including those cells. For each "on"
-     * position in packed, expand it to cover a a square with side length equal to 1 + n * 2, where n starts at 1 and
-     * goes up to include the expansions parameter, with each expansion centered on the original "on" position, unless
-     * the expansion would take a cell further than 0, width - 1 (for xMove) or height - 1 (for yMove), in which case
-     * that cell is stopped at the edge. If a cell is "on" in packed, it will always be "off" in the results.
-     * Returns a new packed short[][] where the outer array has length equal to expansions and the inner arrays are
-     * packed data encoding a one-cell-wide concentric fringe region. Does not modify packed.
-     * @param packed a short[] returned by pack() or one of the sub-arrays in what is returned by packMulti()
-     * @param expansions the positive (square-shaped) radius, in cells, to expand each cell out by, also the length
-     *                   of the outer array returned by this method
-     * @param width the maximum width; if a cell would move to x at least equal to width, it stops at width - 1
-     * @param height the maximum height; if a cell would move to y at least equal to height, it stops at height - 1
-     * @param eightWay true if the expansion should be both diagonal and orthogonal; false for just orthogonal
-     * @return an array of packed arrays that encode "on" for cells that were pushed from the edge of packed's "on"
-     *          cells; the outer array will have length equal to expansions, and inner arrays will normal packed data
+     * Given an array of bounds that should have the same length as the dimensionality of the space-filling curve this
+     * uses, returns a packed array that encodes "on" for the rectangle/rectangular prism/stretched hypercube from the
+     * origin to the point that has coordinates each 1 less than the limit in bounds. Primarily useful with intersect()
+     * to ensure things like negate() that can encode "on" cells in any position are instead limited to the desired
+     * bounding area.
+     * @param bounds the bounding dimensions of the (n-dimensional) rectangle, implicitly using the origin for the
+     *               opposite corner
+     * @return packed data encoding "on" for all cells with coordinates less than their counterpart in bounds.
      */
-    public static short[][] fringes(short[] packed, int expansions, int width, int height, boolean eightWay) {
-        short[][] finished = new short[expansions][];
-        if (packed == null || packed.length <= 1) {
-            Arrays.fill(finished, ALL_WALL);
-            return finished;
-        }
-        ShortSet ss = new ShortSet(256);
-        boolean on = false;
-        int idx = 0;
-        short x, y, dist;
-        int[] xOffsets = new int[]{0, 1, 0, -1, 0}, yOffsets = new int[]{1, 0, -1, 0, 1};
-        for (int p = 0; p < packed.length; p++, on = !on) {
-            if (on) {
-                for (int i = idx; i < idx + (packed[p] & 0xffff); i++) {
-                    ss.add((short) i);
-                }
-            }
-            idx += packed[p] & 0xffff;
-        }
-        for (int expansion = 1; expansion <= expansions; expansion++) {
-            IntVLA vla = new IntVLA(256);
-            on = false;
-            idx = 0;
-            for (int p = 0; p < packed.length; p++, on = !on) {
-                if (on) {
-                    for (int i = idx; i < idx + (packed[p] & 0xffff); i++) {
-                        x = hilbertX[i];
-                        y = hilbertY[i];
-                        for (int d = 0; d < 4; d++) {
-                            for (int e = 1; e <= expansion; e++) {
-                                for (int e2 = 0; e2 < expansion; e2++) {
-                                    int j = Math.min(width - 1, Math.max(0, x + xOffsets[d] * e + yOffsets[d + 1] * e2));
-                                    int k = Math.min(height - 1, Math.max(0, y + yOffsets[d] * e + xOffsets[d + 1] * e2));
-                                    dist = hilbertDistances[j + (k << 8)];
-                                    if (ss.add(dist))
-                                        vla.add(dist);
-                                }
-                            }
-                        }
-                    }
-                }
-                idx += packed[p] & 0xffff;
-            }
-            int[] indices = vla.asInts();
-            if(indices.length < 1)
-            {
-                finished[expansion - 1] = ALL_WALL;
-                continue;
-            }
-            Arrays.sort(indices);
-
-            vla = new IntVLA(128);
-            int current, past = indices[0], skip = 0;
-
-            vla.add((short) indices[0]);
-            for (int i = 1; i < indices.length; i++) {
-                current = indices[i];
-
-                if (current != past)
-                    skip++;
-                if (current - past > 1) {
-                    vla.add((short) (skip + 1));
-                    skip = 0;
-                    vla.add((short) (current - past - 1));
-                }
-                past = current;
-            }
-            vla.add((short) (skip + 1));
-
-            finished[expansion-1] = vla.toArray();
-        }
-        return finished;
-    }
-
-
-    /**
-     * Given a packed array encoding a larger area, a packed array encoding one or more points inside bounds, and an
-     * amount of expansion, expands each cell in start by a Manhattan (diamond) radius equal to expansion, limiting any
-     * expansion to within bounds and returning the final expanded (limited) packed data.  Notably, if a small area is
-     * not present within bounds, then the flood will move around the "hole" similarly to DijkstraMap's behavior;
-     * essentially, it needs to expand around the hole to get to the other side, and this takes more steps of expansion
-     * than crossing straight over.
-     * Returns a new packed short[] and does not modify bounds or start.
-     * @param bounds packed data representing the maximum extent of the region to flood-fill; often floors
-     * @param start a packed array that encodes position(s) that the flood will spread outward from
-     * @param expansion the positive (square) radius, in cells, to expand each cell out by
-     * @return a packed array that encodes "on" for cells that are "on" in bounds and are within expansion Manhattan
-     * distance from a Coord in start
-     */
-    public static short[] flood(short[] bounds, short[] start, int expansion)
+    public EWAHCompressedBitmap32 rectangle(int[] bounds)
     {
-        if(bounds == null || bounds.length <= 1)
-        {
-            return ALL_WALL;
-        }
-        int boundSize = count(bounds);
-        IntVLA vla = new IntVLA(256);
-        ShortSet ss = new ShortSet(boundSize), quickBounds = new ShortSet(boundSize);
-        boolean on = false;
-        int idx = 0;
-        short x, y, dist;
-        for(int p = 0; p < bounds.length; p++, on = !on) {
-            if (on) {
-                for (int i = idx; i < idx + (bounds[p] & 0xffff); i++) {
-                    quickBounds.add((short) i);
-                }
-            }
-            idx += bounds[p] & 0xffff;
-        }
-        short[] s2 = allPackedHilbert(start);
-        int[] xOffsets = new int[]{0, 1, 0, -1}, yOffsets = new int[]{1, 0, -1, 0};
-        for (int e = 0; e < expansion; e++) {
-            IntVLA edge = new IntVLA(128);
-            for (int s = 0; s < s2.length; s++) {
-                int i = s2[s] & 0xffff;
-                x = hilbertX[i];
-                y = hilbertY[i];
-                for (int d = 0; d < 4; d++) {
-                    int j = Math.min(255, Math.max(0, x + xOffsets[d]));
-                    int k = Math.min(255, Math.max(0, y + yOffsets[d]));
-                    dist = hilbertDistances[j + (k << 8)];
-                    if (quickBounds.contains(dist)) {
-                        if (ss.add(dist)) {
-                            vla.add(dist);
-                            edge.add(dist);
-                        }
-                    }
-                }
-            }
-            s2 = edge.toArray();
-        }
+        int b = validateBounds(bounds);
+        boolean[] rect = new boolean[b];
+        Arrays.fill(rect, true);
 
-        int[] indices = vla.asInts();
-        if(indices.length < 1)
-            return ALL_WALL;
-        Arrays.sort(indices);
-
-        vla = new IntVLA(128);
-        int current, past = indices[0], skip = 0;
-
-        vla.add((short)indices[0]);
-        for (int i = 1; i < indices.length; i++) {
-            current = indices[i];
-            if (current - past > 1)
-            {
-                vla.add((short) (skip+1));
-                skip = 0;
-                vla.add((short)(current - past - 1));
-            }
-            else if(current != past)
-                skip++;
-            past = current;
-        }
-        vla.add((short)(skip+1));
-
-        return vla.toArray();
-    }
-
-
-    /**
-     * Given a packed array encoding a larger area, a packed array encoding one or more points inside bounds, and an
-     * amount of expansion, expands each cell in start by a radius (if eightWay is true, it uses Chebyshev distance; if
-     * it is false, it uses Manhattan distance) equal to expansion, limiting any expansion to within bounds and
-     * returning the final expanded (limited) packed data. Notably, if a small area is not present within bounds, then
-     * the flood will move around the "hole" similarly to DijkstraMap's behavior; essentially, it needs to expand around
-     * the hole to get to the other side, and this takes more steps of expansion than crossing straight over.
-     * Returns a new packed short[] and does not modify bounds or start.
-     * @param bounds packed data representing the maximum extent of the region to flood-fill; often floors
-     * @param start a packed array that encodes position(s) that the flood will spread outward from
-     * @param expansion the positive (square) radius, in cells, to expand each cell out by
-     * @param eightWay true to flood-fill out in all eight directions at each step, false for just orthogonal
-     * @return a packed array that encodes "on" for cells that are "on" in bounds and are within expansion either
-     * Chebyshev (if eightWay is true) or Manhattan (otherwise) distance from a Coord in start
-     */
-    public static short[] flood(short[] bounds, short[] start, int expansion, boolean eightWay)
-    {
-        if(!eightWay)
-            return flood(bounds, start, expansion);
-        if(bounds == null || bounds.length <= 1)
-        {
-            return ALL_WALL;
-        }
-        int boundSize = count(bounds);
-        IntVLA vla = new IntVLA(256);
-        ShortSet ss = new ShortSet(boundSize), quickBounds = new ShortSet(boundSize);
-        boolean on = false;
-        int idx = 0;
-        short x, y, dist;
-        for(int p = 0; p < bounds.length; p++, on = !on) {
-            if (on) {
-                for (int i = idx; i < idx + (bounds[p] & 0xffff); i++) {
-                    quickBounds.add((short) i);
-                }
-            }
-            idx += bounds[p] & 0xffff;
-        }
-        short[] s2 = allPackedHilbert(start);
-        int[] xOffsets = new int[]{-1, 0, 1, -1,    1, -1, 0, 1}, yOffsets = new int[]{-1, -1, -1, 0,    0, 1, 1, 1};
-        for (int e = 0; e < expansion; e++) {
-            IntVLA edge = new IntVLA(128);
-            for (int s = 0; s < s2.length; s++) {
-                int i = s2[s] & 0xffff;
-                x = hilbertX[i];
-                y = hilbertY[i];
-                for (int d = 0; d < 8; d++) {
-                    int j = Math.min(255, Math.max(0, x + xOffsets[d]));
-                    int k = Math.min(255, Math.max(0, y + yOffsets[d]));
-                    dist = hilbertDistances[j + (k << 8)];
-                    if (quickBounds.contains(dist)) {
-                        if (ss.add(dist)) {
-                            vla.add(dist);
-                            edge.add(dist);
-                        }
-                    }
-                }
-            }
-            s2 = edge.toArray();
-        }
-
-        int[] indices = vla.asInts();
-        if(indices.length < 1)
-            return ALL_WALL;
-        Arrays.sort(indices);
-
-        vla = new IntVLA(128);
-        int current, past = indices[0], skip = 0;
-
-        vla.add((short)indices[0]);
-        for (int i = 1; i < indices.length; i++) {
-            current = indices[i];
-            if (current - past > 1)
-            {
-                vla.add((short) (skip+1));
-                skip = 0;
-                vla.add((short)(current - past - 1));
-            }
-            else if(current != past)
-                skip++;
-            past = current;
-        }
-        vla.add((short)(skip+1));
-
-        return vla.toArray();
-    }
-
-
-    private static void modifiedShadowFOV(int expansion, int viewerX, int viewerY, Radius metric, ShortSet bounds, ShortSet storedSet, IntVLA vla)
-    {
-        if(expansion < 1)
-            return;
-        short start = hilbertDistances[viewerX + (viewerY << 8)];
-        if(storedSet.add(start))
-            vla.add(start);
-
-        for (Direction d : Direction.DIAGONALS) {
-            modifiedShadowCast(expansion, 1, 1.0, 0.0, 0, d.deltaX, d.deltaY, 0, viewerX, viewerY, metric, bounds, storedSet, vla);
-            modifiedShadowCast(expansion, 1, 1.0, 0.0, d.deltaX, 0, 0, d.deltaY, viewerX, viewerY, metric, bounds, storedSet, vla);
-        }
-    }
-
-    private static void modifiedShadowCast(int expansion, int row, double start, double end, int xx, int xy, int yx, int yy,
-                                     int viewerX, int viewerY, Radius metric, ShortSet bounds, ShortSet storedSet, IntVLA vla) {
-        double newStart = 0;
-        if (start < end) {
-            return;
-        }
-
-        boolean blocked = false;
-        int dist;
-        short currentPos;
-        for (int distance = row; distance <= expansion && !blocked; distance++) {
-            int deltaY = -distance;
-            for (int deltaX = -distance; deltaX <= 0; deltaX++) {
-                int currentX = viewerX + deltaX * xx + deltaY * xy;
-                int currentY = viewerY + deltaX * yx + deltaY * yy;
-                double leftSlope = (deltaX - 0.5f) / (deltaY + 0.5f);
-                double rightSlope = (deltaX + 0.5f) / (deltaY - 0.5f);
-                currentPos = hilbertDistances[currentX + (currentY << 8)];
-
-                /*
-                if (!bounds.contains(currentPos)) {
-                    newStart = rightSlope;
-                    continue;
-                }
-                else
-                 */
-                if(!(currentX - viewerX + expansion >= 0 && currentX - viewerX <= expansion
-                        && currentY - viewerY + expansion >= 0 && currentY - viewerY <= expansion)
-                        || start < rightSlope) {
-                    continue;
-                } else if (end > leftSlope) {
-                    break;
-                }
-
-                if (blocked) { //previous cell was a blocking one
-                    if (!bounds.contains(currentPos)) {//hit a wall
-                        newStart = rightSlope;
-                    } else {
-                        blocked = false;
-                        start = newStart;
-                        dist = metric.roughDistance(currentX - viewerX, currentY - viewerY);
-                        //check if it's within the lightable area and light if needed
-                        if (dist <= expansion * 2) {
-                            if(storedSet.add(currentPos))
-                                vla.add(currentPos);
-                        }
-                    }
-                } else {
-                    if (!bounds.contains(currentPos) && distance < expansion) {//hit a wall within sight line
-                        blocked = true;
-                        modifiedShadowCast(expansion, distance + 1, start, leftSlope, xx, xy, yx, yy, viewerX, viewerY, metric, bounds, storedSet, vla);
-                        newStart = rightSlope;
-                    }
-                    else
-                    {
-                        if(bounds.contains(currentPos)) {
-                            dist = metric.roughDistance(currentX - viewerX, currentY - viewerY);
-                            //check if it's within the lightable area and light if needed
-                            if (dist <= expansion * 2) {
-                                if (storedSet.add(currentPos))
-                                    vla.add(currentPos);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        return pack(rect, bounds);
     }
 
     /**
-     * Given a packed array encoding a larger area, a packed array encoding one or more points inside bounds, and an
-     * amount of expansion, expands each cell in start by a Manhattan (diamond) radius equal to expansion, limiting any
-     * expansion to within bounds and returning the final expanded (limited) packed data.
-     * Though this is otherwise similar to flood(), radiate() behaves like FOV and will not move around obstacles and
-     * will instead avoid expanding if it would go into any cell that cannot be reached by a straight line (drawn
-     * directly, not in grid steps) that is mostly unobstructed.
-     * Returns a new packed short[] and does not modify bounds or start.
-     * @param bounds packed data representing the maximum extent of the region to flood-fill; often floors
-     * @param start a packed array that encodes position(s) that the flood will spread outward from
-     * @param expansion the positive (square) radius, in cells, to expand each cell out by
-     * @return a packed array that encodes "on" for cells that are "on" in bounds and are within expansion Manhattan
-     * distance from a Coord in start
+     * Given arrays of start positions and bounds that should each have the same length as the dimensionality of the
+     * space-filling curve this uses, returns a packed array that encodes "on" for the
+     * rectangle/rectangular prism/stretched hypercube from start to the point that has coordinates each 1 less than the
+     * limit in bounds. Useful with intersect() to ensure things like negate() that can encode "on" cells in any
+     * position are instead limited to the desired bounding area, but also for general "box drawing."
+     * @param start the least corner of the (n-dimensional) rectangle, inclusive
+     * @param bounds the greatest corner of the (n-dimensional) rectangle, exclusive
+     * @return packed data encoding "on" for all cells with coordinates between their counterparts in start and bounds.
      */
-    public static short[] radiate(short[] bounds, short[] start, int expansion)
+    public EWAHCompressedBitmap32 rectangle(int[] start, int[] bounds)
     {
-        return radiate(bounds, start, expansion, Radius.DIAMOND);
-    }
-    /**
-     * Given a packed array encoding a larger area, a packed array encoding one or more points inside bounds, and an
-     * amount of expansion, expands each cell in start by a radius, with a shape determined by metric, equal to
-     * expansion, limiting any expansion to within bounds and returning the final expanded (limited) packed data.
-     * Though this is otherwise similar to flood(), radiate() behaves like FOV and will not move around obstacles and
-     * will instead avoid expanding if it would go into any cell that cannot be reached by a straight line (drawn
-     * directly, not in grid steps) that is mostly unobstructed.
-     * Returns a new packed short[] and does not modify bounds or start.
-     * @param bounds packed data representing the maximum extent of the region to flood-fill; often floors
-     * @param start a packed array that encodes position(s) that the flood will spread outward from
-     * @param expansion the positive (square) radius, in cells, to expand each cell out by
-     * @param metric a Radius that defines how this should expand, SQUARE for 8-way, DIAMOND for 4-way, CIRCLE for
-     *               Euclidean expansion (not guaranteed to be perfectly circular)
-     * @return a packed array that encodes "on" for cells that are "on" in bounds and are within expansion Manhattan
-     * distance from a Coord in start
-     */
-    public static short[] radiate(short[] bounds, short[] start, int expansion, Radius metric)
-    {
-        if(bounds == null || bounds.length <= 1)
-        {
-            return ALL_WALL;
-        }
-        int boundSize = count(bounds);
-        IntVLA vla = new IntVLA(256);
-        ShortSet storedSet = new ShortSet(boundSize), quickBounds = new ShortSet(boundSize);
-        boolean on = false;
-        int idx = 0, i;
-        short x, y;
-        for(int p = 0; p < bounds.length; p++, on = !on) {
-            if (on) {
-                for (i = idx; i < idx + (bounds[p] & 0xffff); i++) {
-                    quickBounds.add((short) i);
-                }
-            }
-            idx += bounds[p] & 0xffff;
-        }
-        short[] s2 = allPackedHilbert(start);
-        for (int s = 0; s < s2.length; s++) {
-            i = s2[s] & 0xffff;
-            x = hilbertX[i];
-            y = hilbertY[i];
+        validateBounds(start);
+        int b = validateBounds(bounds);
+        boolean[] rect = new boolean[b];
 
-            modifiedShadowFOV(expansion, x, y, metric, quickBounds, storedSet, vla);
-        }
-
-        int[] indices = vla.asInts();
-        if(indices.length < 1)
-            return ALL_WALL;
-        Arrays.sort(indices);
-
-        vla = new IntVLA(128);
-        int current, past = indices[0], skip = 0;
-
-        vla.add((short)indices[0]);
-        for (i = 1; i < indices.length; i++) {
-            current = indices[i];
-            if (current - past > 1)
-            {
-                vla.add((short) (skip+1));
-                skip = 0;
-                vla.add((short)(current - past - 1));
-            }
-            else if(current != past)
-                skip++;
-            past = current;
-        }
-        vla.add((short)(skip+1));
-
-        return vla.toArray();
-    }
-
-
-    /**
-     * Given a packed array encoding a larger area, a packed array encoding one or more points inside bounds, and an
-     * amount of expansion, expands each cell in start by a radius, with a square shape if eightWay is true or a diamond
-     * otherwise, equal to expansion, limiting any expansion to within bounds and returning the final expanded (limited)
-     * packed data. Though this is otherwise similar to flood(), radiate() behaves like FOV and will not move around
-     * obstacles and will instead avoid expanding if it would go into any cell that cannot be reached by a straight line
-     * (drawn directly, not in grid steps) that is mostly unobstructed.
-     * Returns a new packed short[] and does not modify bounds or start.
-     * @param bounds packed data representing the maximum extent of the region to flood-fill; often floors
-     * @param start a packed array that encodes position(s) that the flood will spread outward from
-     * @param expansion the positive (square) radius, in cells, to expand each cell out by
-     * @param eightWay true to flood-fill out in all eight directions at each step, false for just orthogonal
-     * @return a packed array that encodes "on" for cells that are "on" in bounds and are within expansion either
-     * Chebyshev (if eightWay is true) or Manhattan (otherwise) distance from a Coord in start
-     */
-    public static short[] radiate(short[] bounds, short[] start, int expansion, boolean eightWay)
-    {
-        if(eightWay)
-            return radiate(bounds, start, expansion, Radius.SQUARE);
-        return radiate(bounds, start, expansion, Radius.DIAMOND);
-    }
-
-    /**
-     * Given a width and height, returns a packed array that encodes "on" for the rectangle from (0,0) to
-     * (width - 1, height - 1). Primarily useful with intersectPacked() to ensure things like negatePacked() that can
-     * encode "on" cells in any position are instead limited to the bounds of the map.
-     * @param width the width of the rectangle
-     * @param height the height of the rectangle
-     * @return a packed short[] encoding "on" for all cells with x less than width and y less than height.
-     */
-    public static short[] rectangle(int width, int height)
-    {
-        if(width > 256 || height > 256)
-            throw new UnsupportedOperationException("Map size is too large to efficiently pack, aborting");
-        boolean[][] rect = new boolean[width][height];
-        for (int i = 0; i < width; i++) {
-            Arrays.fill(rect[i], true);
-        }
-        return pack(rect);
+        throw new UnsupportedOperationException("Not yet implemented");
+        //return pack(rect, bounds);
     }
     /**
      * Given x, y, width and height, returns a packed array that encodes "on" for the rectangle from (x,y) to
@@ -1437,73 +954,69 @@ public class RegionPacker {
         }
         return pack(rect);
     }
-    /**
-     * Given x, y, width and height, returns an array of all Hilbert distance within the rectangle from (x,y) to
-     * (width - 1, height - 1).
-     * @param x the minimum x coordinate
-     * @param y the minimum y coordinate
-     * @param width the width of the rectangle
-     * @param height the height of the rectangle
-     * @return a short[] that is not packed, and instead stores individual Hilbert distances in the rectangle
-     */
-    public static short[] rectangleHilbert(int x, int y, int width, int height)
-    {
-        int width2 = width, height2 = height;
-        if(x + width >= 256)
-            width2 = 256 - x;
-        if(y + height >= 256)
-            height2 = 256 - y;
-        if(width2 <= 0 || height2 <= 0 || x < 0 || y < 0)
-            return new short[0];
-        short[] hilberts = new short[width2 * height2];
-        int idx = 0;
-        for (int i = x; i < x + width2; i++) {
-            for (int j = y; j < y + height2; j++) {
-                hilberts[idx++] = hilbertDistances[i + (j << 8)];
-            }
-        }
-        return hilberts;
-    }
 
     /**
      * Counts the number of "on" cells encoded in a packed array without unpacking it.
      * @param packed a packed short array, as produced by pack()
      * @return the number of "on" cells.
      */
-    public static int count(short[] packed)
+    public int count(EWAHCompressedBitmap32 packed)
     {
-        return count(packed, true);
+        return packed.cardinality();
     }
 
-    /**
-     * Counts the number of cells encoding a boolean equal to wanted in a packed array without unpacking it.
-     * @param packed a packed short array, as produced by pack()
-     * @param wanted the boolean you want to count, true for "on" and false for "off"
-     * @return the number of cells that encode a value equal to wanted.
-     */
-    public static int count(short[] packed, boolean wanted)
+    public EWAHCompressedBitmap32 union(EWAHCompressedBitmap32 left, EWAHCompressedBitmap32 right)
     {
-        int c = 0;
-        boolean on = false;
-        for (int i = 0; i < packed.length; i++, on = !on) {
-            if(on == wanted)
-                c += packed[i] & 0xffff;
-        }
-        return c;
+        return left.or(right);
     }
-    /**
-     * Finds how many cells are encoded in a packed array (both on and off) without unpacking it.
-     * @param packed a packed short array, as produced by pack()
-     * @return the number of cells that are encoded explicitly in the packed data as either on or off.
-     */
-    public static int covered(short[] packed)
+    public EWAHCompressedBitmap32 unionMany(EWAHCompressedBitmap32... bitmaps)
     {
-        int c = 0;
-        for (int i = 0; i < packed.length; i++) {
-            c += packed[i] & 0xffff;
-        }
-        return c;
+        return EWAHCompressedBitmap32.or(bitmaps);
     }
+
+    public EWAHCompressedBitmap32 intersect(EWAHCompressedBitmap32 left, EWAHCompressedBitmap32 right)
+    {
+        return left.and(right);
+    }
+    public EWAHCompressedBitmap32 intersectMany(EWAHCompressedBitmap32... bitmaps)
+    {
+        return EWAHCompressedBitmap32.and(bitmaps);
+    }
+
+    public EWAHCompressedBitmap32 xor(EWAHCompressedBitmap32 left, EWAHCompressedBitmap32 right)
+    {
+        return left.xor(right);
+    }
+    public EWAHCompressedBitmap32 xorMany(EWAHCompressedBitmap32... bitmaps)
+    {
+        return EWAHCompressedBitmap32.xor(bitmaps);
+    }
+
+    public EWAHCompressedBitmap32 difference(EWAHCompressedBitmap32 left, EWAHCompressedBitmap32 right)
+    {
+        return left.andNot(right);
+    }
+
+
+    public EWAHCompressedBitmap32 copy(EWAHCompressedBitmap32 packed)
+    {
+        EWAHCompressedBitmap32 n;
+        try {
+            n = packed.clone();
+        } catch (CloneNotSupportedException e) {
+            return packed;
+        }
+
+        return n;
+    }
+
+    public EWAHCompressedBitmap32 negate(EWAHCompressedBitmap32 packed)
+    {
+        EWAHCompressedBitmap32 n = copy(packed);
+        n.not();
+        return n;
+    }
+
     /**
      * Given two packed short arrays, left and right, this produces a packed short array that encodes "on" for any cell
      * that was "on" in either left or in right, and only encodes "off" for cells that were off in both. This method
@@ -1853,114 +1366,66 @@ public class RegionPacker {
         return packing.toArray();
     }
 
-    /**
-     * Returns a new packed short[] containing the Hilbert distance hilbert as "on", and all other cells "off".
-     * Much more efficient than packSeveral called with only one argument.
-     * @param hilbert a Hilbert distance that will be encoded as "on"
-     * @return the point given to this encoded as "on" in a packed short array
-     */
-    public static short[] packOne(int hilbert)
+    public EWAHCompressedBitmap32 packOne(int... coordinates)
     {
-        return new short[]{(short) hilbert, 1};
+        EWAHCompressedBitmap32 bmp = new EWAHCompressedBitmap32();
+        bmp.set(curve.distance(coordinates));
+        return bmp;
     }
-    /**
-     * Returns a new packed short[] containing the Coord point as "on", and all other cells "off".
-     * Much more efficient than packSeveral called with only one argument.
-     * @param point a Coord that will be encoded as "on"
-     * @return the point given to this encoded as "on" in a packed short array
-     */
-    public static short[] packOne(Coord point)
+    public EWAHCompressedBitmap32 packOneCurve(int distance)
     {
-        return new short[]{(short) coordToHilbert(point), 1};
+        EWAHCompressedBitmap32 bmp = new EWAHCompressedBitmap32();
+        bmp.set(distance);
+        return bmp;
     }
-    /**
-     * Returns a new packed short[] containing the given x,y cell as "on", and all other cells "off".
-     * Much more efficient than packSeveral called with only one argument.
-     * @param x the x component of the point that will be encoded as "on"
-     * @param y the y component of the point that will be encoded as "on"
-     * @return the point given to this encoded as "on" in a packed short array
-     */
-    public static short[] packOne(int x, int y)
+    public EWAHCompressedBitmap32 packSeveral(int[]... points)
     {
-        return new short[]{(short) posToHilbert(x, y), 1};
-    }
-    /**
-     * Returns a new packed short[] containing the Hilbert distances in hilbert as "on" cells, and all other cells "off"
-     * @param hilbert a vararg or array of Hilbert distances that will be encoded as "on"
-     * @return the points given to this encoded as "on" in a packed short array
-     */
-    public static short[] packSeveral(int... hilbert)
-    {
-        if(hilbert.length == 0)
-            return ALL_WALL;
-        Arrays.sort(hilbert);
-        IntVLA vla = new IntVLA(128);
-        int current, past = hilbert[0], skip = 0;
-
-        vla.add((short)hilbert[0]);
-        for (int i = 1; i < hilbert.length; i++) {
-            current = hilbert[i];
-            if (current - past > 1)
-            {
-                vla.add((short) (skip+1));
-                skip = 0;
-                vla.add((short)(current - past - 1));
-            }
-            else if(current != past)
-                skip++;
-            past = current;
-        }
-        vla.add((short)(skip+1));
-        return vla.toArray();
-    }
-
-    /**
-     * Returns a new packed short[] containing the Coords in points as "on" cells, and all other cells "off"
-     * @param points a vararg or array of Coords that will be encoded as "on"
-     * @return the points given to this encoded as "on" in a packed short array
-     */
-    public static short[] packSeveral(Coord... points)
-    {
-        if(points.length == 0)
-            return ALL_WALL;
-        int[] hilbert = new int[points.length];
+        int[] distances = new int[points.length];
         for (int i = 0; i < points.length; i++) {
-            hilbert[i] = coordToHilbert(points[i]);
+            distances[i] = curve.distance(points[i]);
         }
+        return EWAHCompressedBitmap32.bitmapOf(distances);
+    }
+    public EWAHCompressedBitmap32 packSeveralCurve(int... distances)
+    {
+        return EWAHCompressedBitmap32.bitmapOf(distances);
+    }
 
-        Arrays.sort(hilbert);
-        IntVLA vla = new IntVLA(128);
-        int current, past = hilbert[0], skip = 0;
+    public EWAHCompressedBitmap32 insertOne(EWAHCompressedBitmap32 packed, int... coordinates)
+    {
+        EWAHCompressedBitmap32 next = copy(packed);
+        next.set(curve.distance(coordinates));
+        return next;
+    }
+    public EWAHCompressedBitmap32 insertOneCurve(EWAHCompressedBitmap32 packed, int distance)
+    {
+        EWAHCompressedBitmap32 next = copy(packed);
+        next.set(distance);
+        return next;
+    }
 
-        vla.add((short)hilbert[0]);
-        for (int i = 1; i < hilbert.length; i++) {
-            current = hilbert[i];
-            if (current - past > 1)
-            {
-                vla.add((short) (skip+1));
-                skip = 0;
-                vla.add((short)(current - past - 1));
-            }
-            else if(current != past)
-                skip++;
-            past = current;
-        }
-        vla.add((short)(skip+1));
-        return vla.toArray();
+    public EWAHCompressedBitmap32 insertSeveral(EWAHCompressedBitmap32 packed, int[]... points)
+    {
+        return packed.or(packSeveral(points));
+    }
+
+    public EWAHCompressedBitmap32 insertSeveralCurve(EWAHCompressedBitmap32 packed, int... distances)
+    {
+        return packed.or(packSeveralCurve(distances));
     }
     /**
-     * Given one packed short array, original, and a Hilbert Curve index, hilbert, this produces a packed short array
-     * that encodes "on" for any cell that was "on" in original, always encodes "on" for the position referred
+     * Given one packed short array, original, and a space-filling curve index, hilbert, this produces a packed short
+     * array that encodes "on" for any cell that was "on" in original, always encodes "on" for the position referred
      * to by hilbert, and encodes "off" for cells that were "off" in original and are not the cell hilbert refers to.
      * This method does not do any unpacking (which can be somewhat computationally expensive) and so should be strongly
      * preferred when finding a region of one packed array that is not contained in another packed array.
      * @param original A packed array such as one produced by pack()
-     * @param hilbert A Hilbert Curve index that should be inserted into the result
-     * @return A packed array that encodes "on" for all cells that are "on" in original or correspond to hilbert
+     * @param index A space-filling curve index that should be inserted into the result
+     * @return A packed array that encodes "on" for all cells that are "on" in original or correspond to index
      */
-    public static short[] insertPacked(short[] original, short hilbert)
+    public static short[] insertPacked(short[] original, short index)
     {
-        return unionPacked(original, new short[]{hilbert, 1});
+        return unionPacked(original, new short[]{index, 1});
     }
     /**
      * Given one packed short array, original, and a position as x,y numbers, this produces a packed short array
@@ -2147,7 +1612,6 @@ public class RegionPacker {
             }
         }
         return null;
-
     }
 
     /**
@@ -2191,35 +1655,16 @@ public class RegionPacker {
         return coords;
     }
 
-    /**
-     * Quick utility method for printing packed data as a grid of 1 (on) and/or 0 (off). Useful primarily for debugging.
-     * @param packed a packed short[] such as one produced by pack()
-     * @param width the width of the packed 2D array
-     * @param height the height of the packed 2D array
-     */
-    public static void printPacked(short[] packed, int width, int height)
+    public int[] singleRandom(EWAHCompressedBitmap32 packed, RNG random)
     {
-        boolean[][] unpacked = unpack(packed, width, height);
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                System.out.print(unpacked[x][y] ? '1' : '0');
-            }
-            System.out.println();
-        }
+        int[] arr = packed.toArray();
+        int n = random.nextInt(arr.length);
+        return curve.point(arr[n]);
     }
-
-    public static void printCompressedData(short[] packed)
+    public int[] singleRandom(int[] unpacked, RNG random)
     {
-        if(packed == null || packed.length == 0)
-        {
-            System.out.println("[]");
-            return;
-        }
-        System.out.print("[" + packed[0]);
-        for (int i = 1; i < packed.length; i++) {
-            System.out.print(", " + packed[i]);
-        }
-        System.out.println("]");
+        int n = random.nextInt(unpacked.length);
+        return curve.point(unpacked[n]);
     }
 
     /**
@@ -2248,815 +1693,12 @@ public class RegionPacker {
     {
         int len = text.length();
         if(len % 3 != 0)
-            return ALL_WALL;
+            return new short[0];
         char[] chars = text.toCharArray();
         short[] packed = new short[len / 3];
         for (int c = 0, i = 0; c < len; i++, c += 3) {
             packed[i] = (short)(((chars[c] - 59) & 31) | (((chars[c+1] - 59) & 31) << 5) | (((chars[c+2] - 59) & 63) << 10));
         }
         return packed;
-    }
-
-
-    /**
-     * Encode a number n as a Gray code; Gray codes have a relation to the Hilbert curve and may be useful.
-     * Source: http://xn--2-umb.com/15/hilbert , http://aggregate.org/MAGIC/#Gray%20Code%20Conversion
-     * @param n any int
-     * @return the gray code for n
-     */
-    public static int grayEncode(int n){
-        return n ^ (n >> 1);
-    }
-
-    /**
-     * Decode a number from a Gray code n; Gray codes have a relation to the Hilbert curve and may be useful.
-     * Source: http://xn--2-umb.com/15/hilbert , http://aggregate.org/MAGIC/#Gray%20Code%20Conversion
-     * @param n a gray code, as produced by grayEncode
-     * @return the decoded int
-     */
-    public static int grayDecode(int n) {
-        int p = n;
-        while ((n >>= 1) != 0)
-            p ^= n;
-        return p;
-    }
-
-    /**
-     * Not currently used, may be used in the future.
-     * Source: https://www.cs.dal.ca/research/techreports/cs-2006-07 ; algorithm provided in pseudocode
-     * @param n any int
-     * @param mask a bitmask that has some significance to the compacting algorithm
-     * @param i i is I have no clue
-     * @return some kind of magic
-     */
-    public static int grayCodeRank(int n, int mask, int i)
-    {
-        int r = 0;
-        for (int k = n - 1; k >= 0; k--)
-        {
-            if(((mask >> k) & 1) == 1)
-                r = (r << 1) | ((i >> k) & 1);
-        }
-        return  r;
-    }
-
-    /**
-     *
-     * Source: https://www.cs.dal.ca/research/techreports/cs-2006-07 ; algorithm provided in pseudocode
-     * @param n a gray code, I think
-     * @param mask some bitmask or something? check the paper
-     * @param altMask another bitmask I guess, again, check the paper
-     * @param rank if I had to wager a guess, this is something about rank
-     * @return some other kind of magic
-     */
-    public static int grayCodeRankInverse(int n, int mask, int altMask, int rank)
-    {
-        int i = 0, g = 0, j = Integer.bitCount(mask) - 1;
-        for(int k = n - 1; k >= 0; k--)
-        {
-            if(((mask >> k) & 1) == 1)
-            {
-                i ^= (-((rank >> j) & 1) ^ i) & (1 << k);
-                g ^= (-((((i >> k) & 1) + ((i >> k) & 1)) % 2) ^ g) & (1 << k);
-                --j;
-            }
-            else
-            {
-                g ^= (-((altMask >> k) & 1) ^ g) & (1 << k);
-                i ^= (-((((g >> k) & 1) + ((i >> (k+1)) & 1)) % 2) ^ i) & (1 << k);
-            }
-        }
-        return  i;
-    }
-
-    /**
-     * Takes an x, y position and returns the length to travel along the 256x256 Hilbert curve to reach that position.
-     * This assumes x and y are between 0 and 255, inclusive.
-     * This uses a lookup table for the 256x256 Hilbert Curve, which should make it faster than calculating the
-     * distance along the Hilbert Curve repeatedly.
-     * Source: http://and-what-happened.blogspot.com/2011/08/fast-2d-and-3d-hilbert-curves-and.html
-     * @param x between 0 and 255 inclusive
-     * @param y between 0 and 255 inclusive
-     * @return the distance to travel along the 256x256 Hilbert Curve to get to the given x, y point.
-     */
-    public static int posToHilbert( final int x, final int y ) {
-        //int dist = posToHilbertNoLUT(x, y);
-        //return dist;
-        return hilbertDistances[x + (y << 8)] & 0xffff;
-    }
-    /**
-     * Takes an x, y, z position and returns the length to travel along the 16x16x16 Hilbert curve to reach that
-     * position. This assumes x, y, and z are between 0 and 15, inclusive.
-     * This uses a lookup table for the 16x16x16 Hilbert Curve, which should make it faster than calculating the
-     * distance along the Hilbert Curve repeatedly.
-     * Source: http://and-what-happened.blogspot.com/2011/08/fast-2d-and-3d-hilbert-curves-and.html
-     * @param x between 0 and 15 inclusive
-     * @param y between 0 and 15 inclusive
-     * @param z between 0 and 15 inclusive
-     * @return the distance to travel along the 32x32x32 Hilbert Curve to get to the given x, y, z point.
-     */
-    public static int posToHilbert3D( final int x, final int y, final int z ) {
-        return hilbert3Distances[x + (y << 4) + (z << 8)];
-    }
-    /**
-     * Takes an x, y position and returns the length to travel along the 16x16 Moore curve to reach that position.
-     * This assumes x and y are between 0 and 15, inclusive.
-     * This uses a lookup table for the 16x16 Moore Curve, which should make it faster than calculating the
-     * distance along the Moore Curve repeatedly.
-     * @param x between 0 and 15 inclusive
-     * @param y between 0 and 15 inclusive
-     * @return the distance to travel along the 16x16 Moore Curve to get to the given x, y point.
-     */
-    public static int posToMoore( final int x, final int y ) {
-        return mooreDistances[x + (y << 4)] & 0xff;
-    }
-    /*
-     * Takes an x, y position and returns the length to travel along the 256x256 Hilbert curve to reach that position.
-     * This assumes x and y are between 0 and 255, inclusive.
-     * Source: http://and-what-happened.blogspot.com/2011/08/fast-2d-and-3d-hilbert-curves-and.html
-     * @param x between 0 and 255 inclusive
-     * @param y between 0 and 255 inclusive
-     * @return the distance to travel along the 256x256 Hilbert Curve to get to the given x, y point.
-     */
-
-    private static int posToHilbertNoLUT( final int x, final int y )
-    {
-        int hilbert = 0, remap = 0xb4, mcode, hcode;
-        /*
-        while( block > 0 )
-        {
-            --block;
-            mcode = ( ( x >> block ) & 1 ) | ( ( ( y >> ( block ) ) & 1 ) << 1);
-            hcode = ( ( remap >> ( mcode << 1 ) ) & 3 );
-            remap ^= ( 0x82000028 >> ( hcode << 3 ) );
-            hilbert = ( ( hilbert << 2 ) + hcode );
-        }
-         */
-
-        mcode = ( ( x >> 7 ) & 1 ) | ( ( ( y >> ( 7 ) ) & 1 ) << 1);
-        hcode = ( ( remap >> ( mcode << 1 ) ) & 3 );
-        remap ^= ( 0x82000028 >> ( hcode << 3 ) );
-        hilbert = ( ( hilbert << 2 ) + hcode );
-
-        mcode = ( ( x >> 6 ) & 1 ) | ( ( ( y >> ( 6 ) ) & 1 ) << 1);
-        hcode = ( ( remap >> ( mcode << 1 ) ) & 3 );
-        remap ^= ( 0x82000028 >> ( hcode << 3 ) );
-        hilbert = ( ( hilbert << 2 ) + hcode );
-
-        mcode = ( ( x >> 5 ) & 1 ) | ( ( ( y >> ( 5 ) ) & 1 ) << 1);
-        hcode = ( ( remap >> ( mcode << 1 ) ) & 3 );
-        remap ^= ( 0x82000028 >> ( hcode << 3 ) );
-        hilbert = ( ( hilbert << 2 ) + hcode );
-
-        mcode = ( ( x >> 4 ) & 1 ) | ( ( ( y >> ( 4 ) ) & 1 ) << 1);
-        hcode = ( ( remap >> ( mcode << 1 ) ) & 3 );
-        remap ^= ( 0x82000028 >> ( hcode << 3 ) );
-        hilbert = ( ( hilbert << 2 ) + hcode );
-
-        mcode = ( ( x >> 3 ) & 1 ) | ( ( ( y >> ( 3 ) ) & 1 ) << 1);
-        hcode = ( ( remap >> ( mcode << 1 ) ) & 3 );
-        remap ^= ( 0x82000028 >> ( hcode << 3 ) );
-        hilbert = ( ( hilbert << 2 ) + hcode );
-
-        mcode = ( ( x >> 2 ) & 1 ) | ( ( ( y >> ( 2 ) ) & 1 ) << 1);
-        hcode = ( ( remap >> ( mcode << 1 ) ) & 3 );
-        remap ^= ( 0x82000028 >> ( hcode << 3 ) );
-        hilbert = ( ( hilbert << 2 ) + hcode );
-
-        mcode = ( ( x >> 1 ) & 1 ) | ( ( ( y >> ( 1 ) ) & 1 ) << 1);
-        hcode = ( ( remap >> ( mcode << 1 ) ) & 3 );
-        remap ^= ( 0x82000028 >> ( hcode << 3 ) );
-        hilbert = ( ( hilbert << 2 ) + hcode );
-
-        mcode = ( x & 1 ) | ( ( y & 1 ) << 1);
-        hcode = ( ( remap >> ( mcode << 1 ) ) & 3 );
-
-        hilbert = ( ( hilbert << 2 ) + hcode );
-
-        return hilbert;
-    }
-
-    /**
-     * Takes a position as a Morton code, with interleaved x and y bits and x in the least significant bit, and returns
-     * the length to travel along the 256x256 Hilbert Curve to reach that position.
-     * This uses 16 bits of the Morton code and requires that the code is non-negative.
-     * Source: http://and-what-happened.blogspot.com/2011/08/fast-2d-and-3d-hilbert-curves-and.html
-     * @param morton a Morton code that interleaves two 8-bit unsigned numbers, with x as index1 and y as index2.
-     * @return a distance to travel down the Hilbert Curve to reach the location that can be decoded from morton.
-     */
-    public static int mortonToHilbert( final int morton )
-    {
-        int hilbert = 0;
-        int remap = 0xb4;
-        int block = BITS;
-        while( block > 0 )
-        {
-            block -= 2;
-            int mcode = ( ( morton >> block ) & 3 );
-            int hcode = ( ( remap >> ( mcode << 1 ) ) & 3 );
-            remap ^= ( 0x82000028 >> ( hcode << 3 ) );
-            hilbert = ( ( hilbert << 2 ) + hcode );
-        }
-        return hilbert;
-    }
-
-    /**
-     * Takes a distance to travel along the 256x256 Hilbert curve and returns a Morton code representing the position
-     * in 2D space that corresponds to that point on the Hilbert Curve; the Morton code will have interleaved x and y
-     * bits and x in the least significant bit. This uses a lookup table for the 256x256 Hilbert curve, which should
-     * make it faster than calculating the position repeatedly.
-     * The parameter hilbert is an int but only 16 unsigned bits are used.
-     * @param hilbert a distance to travel down the Hilbert Curve
-     * @return a Morton code that stores x and y interleaved; can be converted to a Coord with other methods.
-     */
-
-    public static int hilbertToMorton( final int hilbert )
-    {
-        return mortonEncode(hilbertX[hilbert], hilbertY[hilbert]);
-    }
-
-    /**
-     * Takes a distance to travel along the 256x256 Hilbert curve and returns a Coord representing the position
-     * in 2D space that corresponds to that point on the Hilbert curve. This uses a lookup table for the
-     * 256x256 Hilbert curve, which should make it faster than calculating the position repeatedly.
-     * The parameter hilbert is an int but only 16 unsigned bits are used.
-     * @param hilbert a distance to travel down the Hilbert Curve
-     * @return a Coord corresponding to the position in 2D space at the given distance down the Hilbert Curve
-     */
-    public static Coord hilbertToCoord( final int hilbert )
-    {
-        return Coord.get(hilbertX[hilbert], hilbertY[hilbert]);
-    }
-
-    /**
-     * Takes a distance to travel along the 16x16 Hilbert curve and returns a Coord representing the position
-     * in 2D space that corresponds to that point on the Hilbert curve. This uses a lookup table for the
-     * 16x16 Hilbert curve, which should make it faster than calculating the position repeatedly.
-     * The parameter moore is an int but only 8 unsigned bits are used, and since the Moore Curve loops, it is
-     * calculated as {@code moore % 256}.
-     * @param moore a distance to travel down the Moore Curve
-     * @return a Coord corresponding to the position in 2D space at the given distance down the Hilbert Curve
-     */
-    public static Coord mooreToCoord( final int moore )
-    {
-        return Coord.get(mooreX[moore % 256], mooreY[moore % 256]);
-    }
-
-
-    /*
-     * Takes a distance to travel along the 256x256 Hilbert curve and returns a Morton code representing the position
-     * in 2D space that corresponds to that point on the Hilbert curve; the Morton code will have interleaved x and y
-     * bits and x in the least significant bit. This variant does not use a lookup table, and is likely slower.
-     * The parameter hilbert is an int but only 16 unsigned bits are used.
-     * @param hilbert
-     * @return
-     */
-    /*
-    public static int hilbertToMortonNoLUT( final int hilbert )
-    {
-        int morton = 0;
-        int remap = 0xb4;
-        int block = BITS;
-        while( block > 0 )
-        {
-            block -= 2;
-            int hcode = ( ( hilbert >> block ) & 3 );
-            int mcode = ( ( remap >> ( hcode << 1 ) ) & 3 );
-            remap ^= ( 0x330000cc >> ( hcode << 3 ) );
-            morton = ( ( morton << 2 ) + mcode );
-        }
-        return morton;
-    }
-    */
-
-    /**
-     * Takes a distance to travel along the 256x256 Hilbert curve and returns a Coord representing the position
-     * in 2D space that corresponds to that point on the Hilbert curve. This variant does not use a lookup table,
-     * and is likely slower.
-     * The parameter hilbert is an int but only 16 unsigned bits are used.
-     * @param hilbert
-     * @return
-     */
-    private static Coord hilbertToCoordNoLUT( final int hilbert )
-    {
-        int x = 0, y = 0;
-        int remap = 0xb4;
-        int block = BITS;
-        while( block > 0 )
-        {
-            block -= 2;
-            int hcode = ( ( hilbert >> block ) & 3 );
-            int mcode = ( ( remap >> ( hcode << 1 ) ) & 3 );
-            remap ^= ( 0x330000cc >> ( hcode << 3 ) );
-            x = (x << 1) + (mcode & 1);
-            y = (y << 1) + ((mcode & 2) >> 1);
-        }
-        return Coord.get(x, y);
-    }
-
-    /**
-     * Takes a position as a Coord called pt and returns the length to travel along the 256x256 Hilbert curve to reach
-     * that position.
-     * This assumes pt.x and pt.y are between 0 and 255, inclusive.
-     * Source: http://and-what-happened.blogspot.com/2011/08/fast-2d-and-3d-hilbert-curves-and.html
-     * @param pt a Coord with values between 0 and 255, inclusive
-     * @return a distance from the start of the 256x256 Hilbert curve to get to the position of pt
-     */
-    public static int coordToHilbert(final Coord pt)
-    {
-        return posToHilbert(pt.x, pt.y);
-    }
-
-    /**
-     * Takes a position as a Coord called pt and returns the length to travel along the 16x16 Moore curve to reach
-     * that position.
-     * This assumes pt.x and pt.y are between 0 and 15, inclusive.
-     * @param pt a Coord with values between 0 and 15, inclusive
-     * @return a distance from the "start" of the 16x16 Moore curve to get to the position of pt
-     */
-    public static int coordToMoore(final Coord pt)
-    {
-        return posToMoore(pt.x, pt.y);
-    }
-
-    private static int mortonEncode3D( int index1, int index2, int index3 )
-    { // pack 3 5-bit indices into a 15-bit Morton code
-        index1 &= 0x0000001f;
-        index2 &= 0x0000001f;
-        index3 &= 0x0000001f;
-        index1 *= 0x01041041;
-        index2 *= 0x01041041;
-        index3 *= 0x01041041;
-        index1 &= 0x10204081;
-        index2 &= 0x10204081;
-        index3 &= 0x10204081;
-        index1 *= 0x00011111;
-        index2 *= 0x00011111;
-        index3 *= 0x00011111;
-        index1 &= 0x12490000;
-        index2 &= 0x12490000;
-        index3 &= 0x12490000;
-        return( ( index1 >> 16 ) | ( index2 >> 15 ) | ( index3 >> 14 ) );
-    }
-    private static void computeHilbert3D(int x, int y, int z)
-    {
-        int hilbert = mortonEncode3D(x, y, z);
-        int block = 9;
-        int hcode = ( ( hilbert >> block ) & 7 );
-        int mcode, shift, signs;
-        shift = signs = 0;
-        while( block > 0 )
-        {
-            block -= 3;
-            hcode <<= 2;
-            mcode = ( ( 0x20212021 >> hcode ) & 3 );
-            shift = ( ( 0x48 >> ( 7 - shift - mcode ) ) & 3 );
-            signs = ( ( signs | ( signs << 3 ) ) >> mcode );
-            signs = ( ( signs ^ ( 0x53560300 >> hcode ) ) & 7 );
-            mcode = ( ( hilbert >> block ) & 7 );
-            hcode = mcode;
-            hcode = ( ( ( hcode | ( hcode << 3 ) ) >> shift ) & 7 );
-            hcode ^= signs;
-            hilbert ^= ( ( mcode ^ hcode ) << block );
-        }
-
-        hilbert ^= ( ( hilbert >> 1 ) & 0x92492492 );
-        hilbert ^= ( ( hilbert & 0x92492492 ) >> 1 );
-
-        hilbert3X[hilbert] = (short)x;
-        hilbert3Y[hilbert] = (short)y;
-        hilbert3Z[hilbert] = (short)z;
-        hilbert3Distances[x + (y << 4) + (z << 8)] = (short)hilbert;
-    }
-    private static int nextGray(int gray)
-    {
-        return gray ^ (((Integer.bitCount(gray) & 1) == 1) ? (Integer.highestOneBit(gray & (-gray)) << 1) : 1);
-    }
-    private static int grayAxis(int gray)
-    {
-        // yes, that's octal. it occasionally is useful?
-        if((gray & 0444444444) > 0)
-            return 0; //x
-        else if((gray & 0222222222) > 0)
-            return 1; //y
-        return 2; //z
-    }
-
-    private static int getDim(int element, int x, int y, int z) {
-        switch (element) {
-            case 0:
-                return x;
-            case 1:
-                return y;
-            default:
-                return z;
-        }
-    }
-    private static int[] g_mask = new int[]{4,2,1};
-
-    /**
-     * See http://www.dcs.bbk.ac.uk/TriStarp/pubs/JL1_00.pdf
-     * @param i ???
-     * @param x ????
-     * @param y ?????
-     * @param z ??????
-     * @return ???????????????????????
-     */
-    private static int calc_P (int i, int x, int y, int z)
-    {
-        int element= i / 0x3;
-        int P, temp1, temp2;
-        P = getDim(element, x, y, z);
-        if (i % 0x3 > 0x3 - 03)
-        {
-            temp1 = P = getDim(element + 1, x, y, z);
-            P >>= i % 0x3;
-            temp1 <<= 0x3 - i % 0x3;
-            P |= temp1;
-        }
-        else
-            P >>= i % 0x3; /* P is a 03 bit hcode */
-        return P;
-    }
-    private static int calc_J (int P)
-    {
-        int i = 0;
-        int J = 03;
-        for (i = 1; i < 03; i++) {
-            if ((P >> i & 1) != (P & 1))
-                break;
-        }
-        if (i != 03)
-            J -= i;
-        return J;
-    }
-    private static int calc_T (int P)
-    {
-        if (P < 3)
-            return 0;
-        if (P % 2 > 0)
-            return (P - 1) ^ (P - 1) / 2;
-        return (P - 2) ^ (P - 2) / 2;
-    }
-    private  static int calc_tS_tT(int xJ, int val)
-    {
-        int retval = val, temp1, temp2;
-        if (xJ % 03 != 0)
-        {
-            temp1 = val >> xJ % 03;
-            temp2 = val << 03 - xJ % 03;
-            retval = temp1 | temp2;
-            retval &= ((int)1 << 03) - 1;
-        }
-        return retval;
-    }
-
-    int H_encode(int x, int y, int z) {
-        int mask = (int) 1 << 0x3 - 1, W = 0, P = 0, h = 0, i = 0x3 * 03 - 03,
-                A, S, tS, T, tT, J, xJ, j;
-        for (j = A = 0; j < 03; j++)
-            if ((getDim(j, x, y, z) & mask) > 0)
-                A |= g_mask[j];
-        S = A;
-        P = grayEncode(S); // gray code
-        h |= P << i;
-        J = calc_J(P);
-        xJ = J - 1;
-        T = calc_T(P);
-        tT = T;
-        for (i -= 03, mask >>= 1; i >= 0; i -= 03, mask >>= 1) {
-            for (j = A = 0; j < 03; j++) {
-                if ((getDim(j, x, y, z) & mask) > 0)
-                    A |= g_mask[j];
-            }
-            W ^= tT;
-            tS = A ^ W;
-            S = calc_tS_tT(xJ, tS);
-            P = grayEncode(S);
-
-            h |= P << i;
-
-            if (i > 0) {
-                T = calc_T(P);
-                tT = calc_tS_tT(xJ, T);
-                J = calc_J(P);
-                xJ += J - 1;
-            }
-        }
-        return h;
-    }
-
-
-    private static void computePukaHilbert3D() {
-        for (int h = 0, p = 0; h < 0x1000; h += 8, p += 125) {
-            int startX = hilbert3X[h], startY = hilbert3Y[h], startZ = hilbert3Z[h],
-                    endX = hilbert3X[h+7], endY = hilbert3Y[h+7], endZ = hilbert3Z[h+7],
-                    bottomX = startX >> 1, bottomY = startY >> 1, bottomZ = startZ >> 1;
-            int direction, rotation;
-            if(startX < endX) {
-                direction = 0;
-                rotation = ((startZ & 1) << 1) | (startY & 1);
-            }
-            else if(startX > endX) {
-                direction = 3;
-                rotation = ((startZ & 1) << 1) | (startY & 1);
-            }
-            else if(startY < endY) {
-                direction = 1;
-                rotation = ((startZ & 1) << 1) | (startX & 1);
-            }
-            else if(startY > endY) {
-                direction = 4;
-                rotation = ((startZ & 1) << 1) | (startX & 1);
-            }
-            else if(startZ < endZ) {
-                direction = 2;
-                rotation = ((startY & 1) << 1) | (startX & 1);
-            }
-            else {
-                direction = 5;
-                rotation = ((startY & 1) << 1) | (startX & 1);
-            }
-            rotation = rotation ^ (rotation >> 1);
-            byte x, y, z;
-            for (int i = 0; i < 125; i++) {
-                ph3X[p + i] = x = (byte)(pukaRotations[direction * 4 + rotation][0][i] + bottomX * 5);
-                ph3Y[p + i] = y = (byte)(pukaRotations[direction * 4 + rotation][1][i] + bottomY * 5);
-                ph3Z[p + i] = z = (byte)(pukaRotations[direction * 4 + rotation][2][i] + bottomZ * 5);
-                ph3Distances[x + y * 40 + z * 1600] = (short)(p + i);
-            }
-        }
-    }
-
-    /**
-     * Gets the x coordinate for a given index into the 16x16x(8*n) Moore curve. Expects indices to touch the following
-     * corners of the 16x16x(8*n) cube in this order, using x,y,z syntax:
-     * (0,0,0) (0,0,(8*n)) (0,16,(8*n)) (0,16,0) (16,16,0) (16,16,(8*n)) (16,0,(8*n)) (16,0,0)
-     * @param index the index into the 3D 16x16x(8*n) Moore Curve, must be less than 0x1000
-     * @param n the number of 8-deep layers to use as part of the box shape this travels through
-     * @return the x coordinate of the given distance traveled through the 3D 16x16x(8*n) Moore Curve
-     */
-    public static int getXMoore3D(final int index, final int n) {
-        int hilbert = index & 0x1ff;
-        int sector = index >> 9;
-        if (sector < 2 * n)
-            return 7 - hilbert3X[hilbert];
-        else
-            return 8 + hilbert3X[hilbert];
-    }
-
-    /**
-     * Gets the y coordinate for a given index into the 16x16x(8*n) Moore curve. Expects indices to touch the following
-     * corners of the 16x16x(8*n) cube in this order, using x,y,z syntax:
-     * (0,0,0) (0,0,(8*n)) (0,16,(8*n)) (0,16,0) (16,16,0) (16,16,(8*n)) (16,0,(8*n)) (16,0,0)
-     * @param index the index into the 3D 16x16x(8*n) Moore Curve, must be less than 0x1000
-     * @param n the number of 8-deep layers to use as part of the box shape this travels through
-     * @return the y coordinate of the given distance traveled through the 3D 16x16x(8*n) Moore Curve
-     */
-    public static int getYMoore3D(final int index, final int n)
-    {
-        int hilbert = index & 0x1ff;
-        int sector = index >> 9;
-        if (sector < n || sector >= 3 * n)
-            return 7 - hilbert3Y[hilbert];
-        else
-            return 8 + hilbert3Y[hilbert];
-
-    }
-    /**
-     * Gets the z coordinate for a given index into the 16x16x(8*n) Moore curve. Expects indices to touch the following
-     * corners of the 16x16x(8*n) cube in this order, using x,y,z syntax:
-     * (0,0,0) (0,0,(8*n)) (0,16,(8*n)) (0,16,0) (16,16,0) (16,16,(8*n)) (16,0,(8*n)) (16,0,0)
-     * @param index the index into the 3D 16x16x(8*n) Moore Curve, must be less than 0x1000
-     * @param n the number of 8-deep layers to use as part of the box shape this travels through
-     * @return the z coordinate of the given distance traveled through the 3D 16x16x(8*n) Moore Curve
-     */
-    public static int getZMoore3D(final int index, final int n) {
-        int hilbert = index & 0x1ff;
-        int sector = index >> 9;
-        if (sector / n < 2)
-            return hilbert3Z[hilbert] + 8 * (sector % n);
-        else
-            return (8 * n - 1) - hilbert3Z[hilbert] - 8 * (sector % n);
-    }
-
-
-
-    /**
-     * Takes two 8-bit unsigned integers index1 and index2, and returns a Morton code, with interleaved index1 and
-     * index2 bits and index1 in the least significant bit. With this method, index1 and index2 can have up to 8 bits.
-     * This returns a 16-bit Morton code and WILL encode information in the sign bit if the inputs are large enough.
-     * Source: http://and-what-happened.blogspot.com/2011/08/fast-2d-and-3d-hilbert-curves-and.html
-     * @param index1 a non-negative integer using at most 8 bits, to be placed in the "x" slots
-     * @param index2 a non-negative integer using at most 8 bits, to be placed in the "y" slots
-     * @return a Morton code/Z-Code that interleaves the two numbers into one 16-bit short
-     */
-    public static short zEncode(short index1, short index2)
-    { // pack 2 8-bit (unsigned) indices into a 16-bit (signed...) Morton code/Z-Code
-        index1 &= 0x000000ff;
-        index2 &= 0x000000ff;
-        index1 |= ( index1 << 4 );
-        index2 |= ( index2 << 4 );
-        index1 &= 0x00000f0f;
-        index2 &= 0x00000f0f;
-        index1 |= ( index1 << 2 );
-        index2 |= ( index2 << 2 );
-        index1 &= 0x00003333;
-        index2 &= 0x00003333;
-        index1 |= ( index1 << 1 );
-        index2 |= ( index2 << 1 );
-        index1 &= 0x00005555;
-        index2 &= 0x00005555;
-        return (short)(index1 | ( index2 << 1 ));
-    }
-    /**
-     * Takes two 8-bit unsigned integers index1 and index2, and returns a Morton code, with interleaved index1 and
-     * index2 bits and index1 in the least significant bit. With this method, index1 and index2 can have up to 8 bits.
-     * This returns a 32-bit Morton code but only uses 16 bits, and will not encode information in the sign bit.
-     * Source: http://and-what-happened.blogspot.com/2011/08/fast-2d-and-3d-hilbert-curves-and.html
-     * @param index1 a non-negative integer using at most 8 bits, to be placed in the "x" slots
-     * @param index2 a non-negative integer using at most 8 bits, to be placed in the "y" slots
-     * @return a Morton code that interleaves the two numbers as one 32-bit int, but only in 16 bits of it
-     */
-    public static int mortonEncode(int index1, int index2)
-    { // pack 2 8-bit (unsigned) indices into a 32-bit (signed...) Morton code
-        index1 &= 0x000000ff;
-        index2 &= 0x000000ff;
-        index1 |= ( index1 << 4 );
-        index2 |= ( index2 << 4 );
-        index1 &= 0x00000f0f;
-        index2 &= 0x00000f0f;
-        index1 |= ( index1 << 2 );
-        index2 |= ( index2 << 2 );
-        index1 &= 0x00003333;
-        index2 &= 0x00003333;
-        index1 |= ( index1 << 1 );
-        index2 |= ( index2 << 1 );
-        index1 &= 0x00005555;
-        index2 &= 0x00005555;
-        return index1 | ( index2 << 1 );
-    }
-    /**
-     * Takes two 16-bit unsigned integers index1 and index2, and returns a Morton code, with interleaved index1 and
-     * index2 bits and index1 in the least significant bit. With this method, index1 and index2 can have up to 16 bits.
-     * This returns a 32-bit Morton code and may encode information in the sign bit.
-     * Source: http://and-what-happened.blogspot.com/2011/08/fast-2d-and-3d-hilbert-curves-and.html
-     * @param index1 a non-negative integer using at most 16 bits, to be placed in the "x" slots
-     * @param index2 a non-negative integer using at most 16 bits, to be placed in the "y" slots
-     * @return a Morton code that interleaves the two numbers as one 32-bit int
-     */
-    public static int mortonEncode16(int index1, int index2)
-    { // pack 2 16-bit indices into a 32-bit Morton code
-        index1 &= 0x0000ffff;
-        index2 &= 0x0000ffff;
-        index1 |= ( index1 << 8 );
-        index2 |= ( index2 << 8 );
-        index1 &= 0x00ff00ff;
-        index2 &= 0x00ff00ff;
-        index1 |= ( index1 << 4 );
-        index2 |= ( index2 << 4 );
-        index1 &= 0x0f0f0f0f;
-        index2 &= 0x0f0f0f0f;
-        index1 |= ( index1 << 2 );
-        index2 |= ( index2 << 2 );
-        index1 &= 0x33333333;
-        index2 &= 0x33333333;
-        index1 |= ( index1 << 1 );
-        index2 |= ( index2 << 1 );
-        index1 &= 0x55555555;
-        index2 &= 0x55555555;
-        return index1 | ( index2 << 1 );
-    }
-
-    /**
-     * Takes a Morton code, with interleaved x and y bits and x in the least significant bit, and returns the short
-     * representing the x position.
-     * This uses 16 bits of the 32-bit Morton code/Z-Code.
-     * Source: http://and-what-happened.blogspot.com/2011/08/fast-2d-and-3d-hilbert-curves-and.html
-     * @param morton A Morton code or Z-Code that interleaves two 8-bit numbers
-     * @return A short that represents the x position extracted from the Morton code/Z-Code
-     */
-    public static short zDecodeX( final int morton )
-    { // unpack the 8-bit (unsigned) first index from a 16-bit (unsigned) Morton code/Z-Code
-        short value1 = (short)(morton & 0xffff);
-        value1 &= 0x5555;
-        value1 |= ( value1 >> 1 );
-        value1 &= 0x3333;
-        value1 |= ( value1 >> 2 );
-        value1 &= 0x0f0f;
-        value1 |= ( value1 >> 4 );
-        value1 &= 0x00ff;
-        return value1;
-    }
-    /**
-     * Takes a Morton code, with interleaved x and y bits and x in the least significant bit, and returns the short
-     * representing the y position.
-     * This uses 16 bits of the 32-bit Morton code/Z-Code.
-     * Source: http://and-what-happened.blogspot.com/2011/08/fast-2d-and-3d-hilbert-curves-and.html
-     * @param morton A Morton code or Z-Code that interleaves two 8-bit numbers
-     * @return A short that represents the y position extracted from the Morton code/Z-Code
-     */
-    public static short zDecodeY( final int morton )
-    { // unpack the 8-bit (unsigned) second index from a 16-bit (unsigned) Morton code/Z-Code
-        short value2 = (short)((morton & 0xffff) >>> 1 );
-        value2 &= 0x5555;
-        value2 |= ( value2 >> 1 );
-        value2 &= 0x3333;
-        value2 |= ( value2 >> 2 );
-        value2 &= 0x0f0f;
-        value2 |= ( value2 >> 4 );
-        value2 &= 0x00ff;
-        return value2;
-    }
-
-    /**
-     * Takes a Morton code, with interleaved x and y bits and x in the least significant bit, and returns the Coord
-     * representing the same x, y position.
-     * This uses 16 bits of the Morton code and requires that the code is non-negative.
-     * Source: http://and-what-happened.blogspot.com/2011/08/fast-2d-and-3d-hilbert-curves-and.html
-     * @param morton an int containing two interleaved numbers, from 0 to 255 each
-     * @return a Coord matching the x and y extracted from the Morton code
-     */
-    public static Coord mortonDecode( final int morton )
-    { // unpack 2 8-bit (unsigned) indices from a 32-bit (signed...) Morton code
-        int value1 = morton;
-        int value2 = ( value1 >> 1 );
-        value1 &= 0x5555;
-        value2 &= 0x5555;
-        value1 |= ( value1 >> 1 );
-        value2 |= ( value2 >> 1 );
-        value1 &= 0x3333;
-        value2 &= 0x3333;
-        value1 |= ( value1 >> 2 );
-        value2 |= ( value2 >> 2 );
-        value1 &= 0x0f0f;
-        value2 &= 0x0f0f;
-        value1 |= ( value1 >> 4 );
-        value2 |= ( value2 >> 4 );
-        value1 &= 0x00ff;
-        value2 &= 0x00ff;
-        return Coord.get(value1, value2);
-    }
-
-    /**
-     * Takes a Morton code, with interleaved x and y bits and x in the least significant bit, and returns the Coord
-     * representing the same x, y position.
-     * This takes a a 16-bit Z-Code with data in the sign bit, as returned by zEncode().
-     * Source: http://and-what-happened.blogspot.com/2011/08/fast-2d-and-3d-hilbert-curves-and.html
-     * @param morton a short containing two interleaved numbers, from 0 to 255 each
-     * @return a Coord matching the x and y extracted from the Morton code
-     */
-    public static Coord zDecode( final short morton )
-    { // unpack 2 8-bit (unsigned) indices from a 32-bit (signed...) Morton code
-        int value1 = morton & 0xffff;
-        int value2 = ( value1 >> 1 );
-        value1 &= 0x5555;
-        value2 &= 0x5555;
-        value1 |= ( value1 >> 1 );
-        value2 |= ( value2 >> 1 );
-        value1 &= 0x3333;
-        value2 &= 0x3333;
-        value1 |= ( value1 >> 2 );
-        value2 |= ( value2 >> 2 );
-        value1 &= 0x0f0f;
-        value2 &= 0x0f0f;
-        value1 |= ( value1 >> 4 );
-        value2 |= ( value2 >> 4 );
-        value1 &= 0x00ff;
-        value2 &= 0x00ff;
-        return Coord.get(value1, value2);
-    }
-    /**
-     * Takes a Morton code, with interleaved x and y bits and x in the least significant bit, and returns the Coord
-     * representing the same x, y position. With this method, x and y can have up to 16 bits, but Coords returned by
-     * this method will not be cached if they have a x or y component greater than 255.
-     * This uses 32 bits of the Morton code and will treat the sign bit as the most significant bit of y, unsigned.
-     * Source: http://and-what-happened.blogspot.com/2011/08/fast-2d-and-3d-hilbert-curves-and.html
-     * @param morton an int containing two interleaved shorts.
-     * @return a Coord matching the x and y extracted from the Morton code
-     */
-    public static Coord mortonDecode16( final int morton )
-    { // unpack 2 16-bit indices from a 32-bit Morton code
-        int value1 = morton;
-        int value2 = ( value1 >>> 1 );
-        value1 &= 0x55555555;
-        value2 &= 0x55555555;
-        value1 |= ( value1 >>> 1 );
-        value2 |= ( value2 >>> 1 );
-        value1 &= 0x33333333;
-        value2 &= 0x33333333;
-        value1 |= ( value1 >>> 2 );
-        value2 |= ( value2 >>> 2 );
-        value1 &= 0x0f0f0f0f;
-        value2 &= 0x0f0f0f0f;
-        value1 |= ( value1 >>> 4 );
-        value2 |= ( value2 >>> 4 );
-        value1 &= 0x00ff00ff;
-        value2 &= 0x00ff00ff;
-        value1 |= ( value1 >>> 8 );
-        value2 |= ( value2 >>> 8 );
-        value1 &= 0x0000ffff;
-        value2 &= 0x0000ffff;
-        return Coord.get(value1, value2);
     }
 }

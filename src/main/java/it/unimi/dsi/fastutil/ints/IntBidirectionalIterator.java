@@ -43,7 +43,7 @@ import it.unimi.dsi.fastutil.objects.ObjectBidirectionalIterator;
 /** A type-specific bidirectional iterator; provides an additional method to avoid (un)boxing, and the possibility to skip elements backwards.
  *
  * @see BidirectionalIterator */
-public interface IntBidirectionalIterator extends IntIterator, ObjectBidirectionalIterator<Integer> {
+public interface IntBidirectionalIterator extends IntegerIterator, ObjectBidirectionalIterator<Integer> {
 	/** Returns the previous element as a primitive type.
 	 *
 	 * @return the previous element in the iteration.

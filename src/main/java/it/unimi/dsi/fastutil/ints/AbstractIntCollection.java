@@ -67,7 +67,7 @@ public abstract class AbstractIntCollection extends AbstractCollection<Integer> 
 	 * @return <code>true</code> if this collection changed as a result of the call. */
 	public boolean addAll( IntCollection c ) {
 		boolean retVal = false;
-		final IntIterator i = c.iterator();
+		final IntegerIterator i = c.iterator();
 		int n = c.size();
 		while ( n-- != 0 )
 			if ( add( i.nextInt() ) ) retVal = true;
@@ -79,7 +79,7 @@ public abstract class AbstractIntCollection extends AbstractCollection<Integer> 
 	 * @param c a type-specific collection.
 	 * @return <code>true</code> if this collection contains all elements of the argument. */
 	public boolean containsAll( IntCollection c ) {
-		final IntIterator i = c.iterator();
+		final IntegerIterator i = c.iterator();
 		int n = c.size();
 		while ( n-- != 0 )
 			if ( !contains( i.nextInt() ) ) return false;
@@ -93,7 +93,7 @@ public abstract class AbstractIntCollection extends AbstractCollection<Integer> 
 	public boolean retainAll( IntCollection c ) {
 		boolean retVal = false;
 		int n = size();
-		final IntIterator i = iterator();
+		final IntegerIterator i = iterator();
 		while ( n-- != 0 ) {
 			if ( !c.contains( i.nextInt() ) ) {
 				i.remove();
@@ -110,7 +110,7 @@ public abstract class AbstractIntCollection extends AbstractCollection<Integer> 
 	public boolean removeAll( IntCollection c ) {
 		boolean retVal = false;
 		int n = c.size();
-		final IntIterator i = c.iterator();
+		final IntegerIterator i = c.iterator();
 		while ( n-- != 0 )
 			if ( rem( i.nextInt() ) ) retVal = true;
 		return retVal;
@@ -148,11 +148,11 @@ public abstract class AbstractIntCollection extends AbstractCollection<Integer> 
 
 	/** Delegates to the new covariantly stronger generic method. */
 	@Deprecated
-	public IntIterator intIterator() {
+	public IntegerIterator intIterator() {
 		return iterator();
 	}
 
-	public abstract IntIterator iterator();
+	public abstract IntegerIterator iterator();
 
 	/** Delegates to the type-specific <code>rem()</code> method. */
 	public boolean remove( Object ok ) {
@@ -175,14 +175,14 @@ public abstract class AbstractIntCollection extends AbstractCollection<Integer> 
 	}
 
 	public boolean contains( final int k ) {
-		final IntIterator iterator = iterator();
+		final IntegerIterator iterator = iterator();
 		while ( iterator.hasNext() )
 			if ( k == iterator.nextInt() ) return true;
 		return false;
 	}
 
 	public boolean rem( final int k ) {
-		final IntIterator iterator = iterator();
+		final IntegerIterator iterator = iterator();
 		while ( iterator.hasNext() )
 			if ( k == iterator.nextInt() ) {
 				iterator.remove();
@@ -239,7 +239,7 @@ public abstract class AbstractIntCollection extends AbstractCollection<Integer> 
 
 	public String toString() {
 		final StringBuilder s = new StringBuilder();
-		final IntIterator i = iterator();
+		final IntegerIterator i = iterator();
 		int n = size();
 		int k;
 		boolean first = true;

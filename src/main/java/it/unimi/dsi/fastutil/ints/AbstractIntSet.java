@@ -43,7 +43,7 @@ import java.util.Set;
 public abstract class AbstractIntSet extends AbstractIntCollection implements Cloneable, IntSet {
 	protected AbstractIntSet() {}
 
-	public abstract IntIterator iterator();
+	public abstract IntegerIterator iterator();
 
 	public boolean equals( final Object o ) {
 		if ( o == this ) return true;
@@ -60,7 +60,7 @@ public abstract class AbstractIntSet extends AbstractIntCollection implements Cl
 	 * @return a hash code for this set. */
 	public int hashCode() {
 		int h = 0, n = size();
-		IntIterator i = iterator();
+		IntegerIterator i = iterator();
 		int k;
 		while ( n-- != 0 ) {
 			k = i.nextInt(); // We need k because KEY2JAVAHASH() is a macro with repeated evaluation.

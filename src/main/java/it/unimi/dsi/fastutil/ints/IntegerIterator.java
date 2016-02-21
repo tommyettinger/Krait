@@ -42,7 +42,7 @@ import java.util.Iterator;
 /** A type-specific {@link Iterator}; provides an additional method to avoid (un)boxing, and the possibility to skip elements.
  *
  * @see Iterator */
-public interface IntIterator extends Iterator<Integer> {
+public interface IntegerIterator extends Iterator<Integer> {
 	/** Returns the next element as a primitive type.
 	 *
 	 * @return the next element in the iteration.

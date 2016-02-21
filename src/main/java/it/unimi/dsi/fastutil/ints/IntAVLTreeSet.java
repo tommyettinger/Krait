@@ -131,7 +131,7 @@ public class IntAVLTreeSet extends AbstractIntSortedSet implements java.io.Seria
 	/** Creates a new tree set using elements provided by a type-specific iterator.
 	 *
 	 * @param i a type-specific iterator whose elements will fill the set. */
-	public IntAVLTreeSet( final IntIterator i ) {
+	public IntAVLTreeSet( final IntegerIterator i ) {
 		while ( i.hasNext() )
 			add( i.nextInt() );
 	}

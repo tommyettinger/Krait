@@ -158,7 +158,7 @@ public class IntOpenHashBigSet extends AbstractIntSet implements java.io.Seriali
 	 *
 	 * @param i a type-specific iterator whose elements will fill the new hash big set.
 	 * @param f the load factor. */
-	public IntOpenHashBigSet( final IntIterator i, final float f ) {
+	public IntOpenHashBigSet(final IntegerIterator i, final float f ) {
 		this( DEFAULT_INITIAL_SIZE, f );
 		while ( i.hasNext() )
 			add( i.nextInt() );
@@ -167,7 +167,7 @@ public class IntOpenHashBigSet extends AbstractIntSet implements java.io.Seriali
 	/** Creates a new hash big set with {@link Hash#DEFAULT_LOAD_FACTOR} as load factor using elements provided by a type-specific iterator.
 	 *
 	 * @param i a type-specific iterator whose elements will fill the new hash big set. */
-	public IntOpenHashBigSet( final IntIterator i ) {
+	public IntOpenHashBigSet( final IntegerIterator i ) {
 		this( i, DEFAULT_LOAD_FACTOR );
 	}
 
@@ -437,7 +437,7 @@ public class IntOpenHashBigSet extends AbstractIntSet implements java.io.Seriali
 		}
 	}
 
-	public IntIterator iterator() {
+	public IntegerIterator iterator() {
 		return new SetIterator();
 	}
 
@@ -580,7 +580,7 @@ public class IntOpenHashBigSet extends AbstractIntSet implements java.io.Seriali
 	}
 
 	private void writeObject( java.io.ObjectOutputStream s ) throws java.io.IOException {
-		final IntIterator i = iterator();
+		final IntegerIterator i = iterator();
 		s.defaultWriteObject();
 		for ( long j = size; j-- != 0; )
 			s.writeInt( i.nextInt() );

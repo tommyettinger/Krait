@@ -51,14 +51,14 @@ public interface IntCollection extends Collection<Integer>, IntIterable {
 	 * the fact that this interface extends {@link Collection}.
 	 *
 	 * @return a type-specific iterator on the elements of this collection. */
-	IntIterator iterator();
+	IntegerIterator iterator();
 
 	/** Returns a type-specific iterator on this elements of this collection.
 	 *
 	 * @see #iterator()
 	 * @deprecated As of <code>fastutil</code> 5, replaced by {@link #iterator()}. */
 	@Deprecated
-	IntIterator intIterator();
+	IntegerIterator intIterator();
 
 	/** Returns an containing the items of this collection; the runtime type of the returned array is that of the specified array.
 	 *

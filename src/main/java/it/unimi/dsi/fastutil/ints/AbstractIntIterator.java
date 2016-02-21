@@ -45,7 +45,7 @@ package it.unimi.dsi.fastutil.ints;
  * <P>This class implements also a trivial version of {@link #skip(int)} that uses type-specific methods; moreover, {@link #remove()} will throw an {@link UnsupportedOperationException}.
  *
  * @see java.util.Iterator */
-public abstract class AbstractIntIterator implements IntIterator {
+public abstract class AbstractIntIterator implements IntegerIterator {
 	protected AbstractIntIterator() {}
 
 	/** Delegates to the corresponding generic method. */

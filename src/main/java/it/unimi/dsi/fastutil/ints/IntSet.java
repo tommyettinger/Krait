@@ -51,7 +51,7 @@ public interface IntSet extends IntCollection, Set<Integer> {
 	 * the fact that this interface extends {@link Set}.
 	 *
 	 * @return a type-specific iterator on the elements of this set. */
-	IntIterator iterator();
+	IntegerIterator iterator();
 
 	/** Removes an element from this set.
 	 *

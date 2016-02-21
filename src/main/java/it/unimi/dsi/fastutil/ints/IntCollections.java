@@ -216,12 +216,12 @@ public class IntCollections {
 			}
 		}
 
-		public IntIterator iterator() {
+		public IntegerIterator iterator() {
 			return collection.iterator();
 		}
 
 		@Deprecated
-		public IntIterator intIterator() {
+		public IntegerIterator intIterator() {
 			return iterator();
 		}
 
@@ -321,12 +321,12 @@ public class IntCollections {
 			return collection.contains( o );
 		}
 
-		public IntIterator iterator() {
+		public IntegerIterator iterator() {
 			return IntIterators.unmodifiable( collection.iterator() );
 		}
 
 		@Deprecated
-		public IntIterator intIterator() {
+		public IntegerIterator intIterator() {
 			return iterator();
 		}
 
@@ -432,7 +432,7 @@ public class IntCollections {
 
 		public int size() {
 			int c = 0;
-			final IntIterator iterator = iterator();
+			final IntegerIterator iterator = iterator();
 			while ( iterator.hasNext() ) {
 				iterator.next();
 				c++;
@@ -444,12 +444,12 @@ public class IntCollections {
 			return iterable.iterator().hasNext();
 		}
 
-		public IntIterator iterator() {
+		public IntegerIterator iterator() {
 			return iterable.iterator();
 		}
 
 		@Deprecated
-		public IntIterator intIterator() {
+		public IntegerIterator intIterator() {
 			return iterator();
 		}
 	}

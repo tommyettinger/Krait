@@ -138,7 +138,7 @@ public class IntArrayList extends AbstractIntList implements RandomAccess, Clone
 	/** Creates a new array list and fills it with the elements returned by a type-specific iterator..
 	 *
 	 * @param i a type-specific iterator whose returned elements will fill the array list. */
-	public IntArrayList( final IntIterator i ) {
+	public IntArrayList( final IntegerIterator i ) {
 		this();
 		while ( i.hasNext() )
 			this.add( i.nextInt() );
@@ -342,7 +342,7 @@ public class IntArrayList extends AbstractIntList implements RandomAccess, Clone
 		if ( n == 0 ) return false;
 		grow( size + n );
 		if ( index != size ) System.arraycopy( a, index, a, index + n, size - index );
-		final IntIterator i = c.iterator();
+		final IntegerIterator i = c.iterator();
 		size += n;
 		while ( n-- != 0 )
 			a[ index++ ] = i.nextInt();

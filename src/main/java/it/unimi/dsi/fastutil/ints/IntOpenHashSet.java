@@ -138,7 +138,7 @@ public class IntOpenHashSet extends AbstractIntSet implements java.io.Serializab
 	 *
 	 * @param i a type-specific iterator whose elements will fill the set.
 	 * @param f the load factor. */
-	public IntOpenHashSet( final IntIterator i, final float f ) {
+	public IntOpenHashSet(final IntegerIterator i, final float f ) {
 		this( DEFAULT_INITIAL_SIZE, f );
 		while ( i.hasNext() )
 			add( i.nextInt() );
@@ -147,7 +147,7 @@ public class IntOpenHashSet extends AbstractIntSet implements java.io.Serializab
 	/** Creates a new hash set with {@link Hash#DEFAULT_LOAD_FACTOR} as load factor using elements provided by a type-specific iterator.
 	 *
 	 * @param i a type-specific iterator whose elements will fill the set. */
-	public IntOpenHashSet( final IntIterator i ) {
+	public IntOpenHashSet( final IntegerIterator i ) {
 		this( i, DEFAULT_LOAD_FACTOR );
 	}
 
@@ -441,7 +441,7 @@ public class IntOpenHashSet extends AbstractIntSet implements java.io.Serializab
 		}
 	}
 
-	public IntIterator iterator() {
+	public IntegerIterator iterator() {
 		return new SetIterator();
 	}
 
@@ -561,7 +561,7 @@ public class IntOpenHashSet extends AbstractIntSet implements java.io.Serializab
 	}
 
 	private void writeObject( java.io.ObjectOutputStream s ) throws java.io.IOException {
-		final IntIterator i = iterator();
+		final IntegerIterator i = iterator();
 		s.defaultWriteObject();
 		for ( int j = size; j-- != 0; )
 			s.writeInt( i.nextInt() );
