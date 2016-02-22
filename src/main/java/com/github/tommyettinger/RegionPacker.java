@@ -178,7 +178,7 @@ public class RegionPacker {
      * index 0, is considered the most significant for the integer value of index.
      * @param bounds the bounding dimension lengths as an int array
      * @param index the index, as could be produced by boundedIndex()
-     * @return the point referred to be index within the given bounds.
+     * @return the point referred to by index within the given bounds.
      */
     public static int[] fromBounded(int[] bounds, int index)
     {
@@ -482,14 +482,12 @@ public class RegionPacker {
     private int[][] expandChebyshev(int expansion)
     {
         int[] move = new int[curve.dimensionality.length];
-        int side = expansion * 2 + 1, exp = (int)Math.pow(side, move.length), limit, run;
+        int side = expansion * 2 + 1, exp = (int)Math.pow(side, move.length), run;
         int[][] movers = new int[exp][move.length];
         for (int i = 0; i < exp; i++) {
-            limit = side;
             run = 1;
             for (int d = 0; d < move.length; d++) {
-                move[d] = ((i / run) % limit) - expansion;
-                limit *= side;
+                move[d] = ((i / run) % side) - expansion;
                 run *= side;
             }
             System.arraycopy(move, 0, movers[i], 0, move.length);
@@ -503,18 +501,16 @@ public class RegionPacker {
         if(expansion < 0) expansion = 0;
         else if(expansion > 100) expansion = 100;
         int side = expansion * 2 + 1, cube = (int)Math.pow(side, move.length),
-                exp = 1 + 2 * move.length * manhattan_100[expansion], m = 0, limit, length, run;
+                exp = 1 + 2 * move.length * manhattan_100[expansion], m = 0, length, run;
         int[][] movers = new int[exp][move.length];
         CELL_WISE:
         for (int i = 0; i < cube && m < exp; i++)
         {
-            limit = side;
             run = 1;
             length = 0;
             for (int d = 0; d < move.length; d++) {
-                move[d] = ((i / run) % limit) - expansion;
+                move[d] = ((i / run) % side) - expansion;
                 if((length += Math.abs(move[d])) > expansion) continue CELL_WISE;
-                limit *= side;
                 run *= side;
             }
             System.arraycopy(move, 0, movers[m++], 0, move.length);
@@ -889,7 +885,6 @@ public class RegionPacker {
         return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
     }
 
-
     /**
      * Given an array of bounds that should have the same length as the dimensionality of the space-filling curve this
      * uses, returns a packed array that encodes "on" for the rectangle/rectangular prism/stretched hypercube from the
@@ -921,43 +916,36 @@ public class RegionPacker {
      */
     public EWAHCompressedBitmap32 rectangle(int[] start, int[] bounds)
     {
-        validateBounds(start);
-        int b = validateBounds(bounds);
+        int s = validateBounds(start), b = validateBounds(bounds), run;
+        if(s > b)
+            throw new UnsupportedOperationException("Starting corner of (hyper-)rectangle must not be beyond bounds");
         boolean[] rect = new boolean[b];
-
-        throw new UnsupportedOperationException("Not yet implemented");
-        //return pack(rect, bounds);
-    }
-    /**
-     * Given x, y, width and height, returns a packed array that encodes "on" for the rectangle from (x,y) to
-     * (width - 1, height - 1). Primarily useful with intersectPacked() to ensure things like negatePacked() that can
-     * encode "on" cells in any position are instead limited to the bounds of the map, but also handy for basic "box
-     * drawing" for other uses.
-     * @param x the minimum x coordinate
-     * @param y the minimum y coordinate
-     * @param width the width of the rectangle
-     * @param height the height of the rectangle
-     * @return a packed short[] encoding "on" for all cells with x less than width and y less than height.
-     */
-    public static short[] rectangle(int x, int y, int width, int height)
-    {
-        int width2 = width, height2 = height;
-        if(x + width >= 256)
-            width2 = 255 - x;
-        if(y + height >= 256)
-            height2 = 255 - y;
-        if(width2 < 0 || height2 < 0 || x < 0 || y < 0)
-            return ALL_WALL;
-        boolean[][] rect = new boolean[x + width2][y + height2];
-        for (int i = x; i < x + width2; i++) {
-            Arrays.fill(rect[i], y, y + height2, true);
+        int[] pt = new int[bounds.length], sides = new int[bounds.length];
+        for (int i = 0; i < bounds.length; i++) {
+            int l = bounds[i] - start[i];
+            if(l < 1)
+                return ALL_WALL;
+            sides[i] = l;
         }
-        return pack(rect);
+
+        for (int i = 0; i < b; i++) {
+            run = 1;
+            for (int d = pt.length - 1; d >= 0; d--) {
+                pt[d] = ((i / run) % sides[d]) + start[d];
+                run *= sides[d];
+            }
+            run = boundedIndex(bounds, pt);
+            if(run >= 0)
+                rect[run] = true;
+        }
+
+        return pack(rect, bounds);
     }
 
     /**
-     * Counts the number of "on" cells encoded in a packed array without unpacking it.
-     * @param packed a packed short array, as produced by pack()
+     * Counts the number of "on" cells encoded in a packed array without unpacking it. Equivalent to calling
+     * {@code packed.cardinality()}.
+     * @param packed a packed bitmap, as produced by pack()
      * @return the number of "on" cells.
      */
     public int count(EWAHCompressedBitmap32 packed)
@@ -965,39 +953,93 @@ public class RegionPacker {
         return packed.cardinality();
     }
 
+    /**
+     * Gets a new packed bitmap that encodes all cells that are "on" in either left or right; the logical "or"
+     * operation. Equivalent to calling {@code left.or(right)}.
+     * @param left a bitmap to get the union of
+     * @param right a bitmap to get the union of
+     * @return the union of the two bitmaps
+     */
     public EWAHCompressedBitmap32 union(EWAHCompressedBitmap32 left, EWAHCompressedBitmap32 right)
     {
         return left.or(right);
     }
+
+    /**
+     * Gets a new packed bitmap that encodes all cells that are "on" in any of the bitmaps passed to it as an array or
+     * vararg; the logical "or" operation. Equivalent to calling {@code EWAHCompressedBitmap32.or(bitmaps)}.
+     * @param bitmaps an array or vararg of bitmaps to get the union of
+     * @return the union of all of the bitmaps
+     */
     public EWAHCompressedBitmap32 unionMany(EWAHCompressedBitmap32... bitmaps)
     {
         return EWAHCompressedBitmap32.or(bitmaps);
     }
 
+    /**
+     * Gets a new packed bitmap that encodes all cells that are "on" in both left and right; the logical "and"
+     * operation. Equivalent to calling {@code left.and(right)}.
+     * @param left a bitmap to get the intersection of
+     * @param right a bitmap to get the intersection of
+     * @return the intersection of the two bitmaps
+     */
     public EWAHCompressedBitmap32 intersect(EWAHCompressedBitmap32 left, EWAHCompressedBitmap32 right)
     {
         return left.and(right);
     }
+
+    /**
+     * Gets a new packed bitmap that encodes all cells that are "on" in all of the bitmaps passed to it as an array or
+     * vararg; the logical "and" operation. Equivalent to calling {@code EWAHCompressedBitmap32.and(bitmaps)}.
+     * @param bitmaps an array or vararg of bitmaps to get the intersection of
+     * @return the intersection of all of the bitmaps
+     */
     public EWAHCompressedBitmap32 intersectMany(EWAHCompressedBitmap32... bitmaps)
     {
         return EWAHCompressedBitmap32.and(bitmaps);
     }
 
+    /**
+     * Gets a new packed bitmap that encodes all cells that are "on" in exactly one of left or right; the logical "xor"
+     * operation. Equivalent to calling {@code left.xor(right)}.
+     * @param left a bitmap to get the exclusive disjunction (xor) of
+     * @param right a bitmap to get the exclusive disjunction (xor) of
+     * @return the exclusive disjunction (xor) of the two bitmaps
+     */
     public EWAHCompressedBitmap32 xor(EWAHCompressedBitmap32 left, EWAHCompressedBitmap32 right)
     {
         return left.xor(right);
     }
+
+    /**
+     * Gets a new packed bitmap that encodes all cells that are "on" in an odd number of the bitmaps passed to it as an
+     * array or vararg; the logical "xor" operation. Equivalent to calling {@code EWAHCompressedBitmap32.xor(bitmaps)}.
+     * @param bitmaps an array or vararg of bitmaps to get the exclusive disjunction (xor) of
+     * @return the exclusive disjunction (xor) of all of the bitmaps
+     */
     public EWAHCompressedBitmap32 xorMany(EWAHCompressedBitmap32... bitmaps)
     {
         return EWAHCompressedBitmap32.xor(bitmaps);
     }
 
+    /**
+     * Gets a new packed bitmap that encodes all cells that are "on" in left and "off" in right; the logical "nand"
+     * operation. Equivalent to calling {@code left.andNot(right)}.
+     * @param left a bitmap to subtract bits from
+     * @param right a bitmap that will be subtracted
+     * @return the difference of the two bitmaps
+     */
     public EWAHCompressedBitmap32 difference(EWAHCompressedBitmap32 left, EWAHCompressedBitmap32 right)
     {
         return left.andNot(right);
     }
 
 
+    /**
+     * Copies packed without extra boilerplate, returning a new packed bitmap containing the same data.
+     * @param packed a packed bitmap to copy
+     * @return the copied bitmap
+     */
     public EWAHCompressedBitmap32 copy(EWAHCompressedBitmap32 packed)
     {
         EWAHCompressedBitmap32 n;
@@ -1010,6 +1052,13 @@ public class RegionPacker {
         return n;
     }
 
+    /**
+     * Gets a negated copy of the packed bitmap, turning all "on" bits to "off" and all "off" bits to "on." Not
+     * equivalent to {@code packed.not()}, which would mutate packed in place; instead equivalent to the example given
+     * in the documentation for not(), which copies packed first.
+     * @param packed the packed bitmap to find the negation of
+     * @return a negated copy of packed
+     */
     public EWAHCompressedBitmap32 negate(EWAHCompressedBitmap32 packed)
     {
         EWAHCompressedBitmap32 n = copy(packed);
@@ -1018,385 +1067,88 @@ public class RegionPacker {
     }
 
     /**
-     * Given two packed short arrays, left and right, this produces a packed short array that encodes "on" for any cell
-     * that was "on" in either left or in right, and only encodes "off" for cells that were off in both. This method
-     * does not do any unpacking (which can be somewhat computationally expensive) and so should be strongly preferred
-     * when merging two pieces of packed data.
-     * @param left A packed array such as one produced by pack()
-     * @param right A packed array such as one produced by pack()
-     * @return A packed array that encodes "on" for all cells that were "on" in either left or right
+     * Given an array or vararg of coordinates that must have length equal to the number of dimensions in this
+     * RegionPacker's CurveStrategy, returns a new packed bitmap that encodes only that point.
+     * @param coordinates an array or vararg of coordinates that defines a point; must match the curve's dimension count
+     * @return a new packed bitmap encoding only the point with the given coordinates
      */
-    public static short[] unionPacked(short[] left, short[] right)
-    {
-        if(left.length == 0)
-            return right;
-        if(right.length == 0)
-            return left;
-        IntVLA packing = new IntVLA(64);
-        boolean on = false, onLeft = false, onRight = false;
-        int idx = 0, skip = 0, elemLeft = 0, elemRight = 0, totalLeft = 0, totalRight = 0;
-        while ((elemLeft < left.length || elemRight < right.length) && idx <= 0xffff) {
-            if (elemLeft >= left.length) {
-                totalLeft = 0xffff;
-                onLeft = false;
-            }
-            else if(totalLeft <= idx) {
-                totalLeft += left[elemLeft] & 0xffff;
-            }
-            if(elemRight >= right.length) {
-                totalRight = 0xffff;
-                onRight = false;
-            }
-            else if(totalRight <= idx) {
-                totalRight += right[elemRight] & 0xffff;
-            }
-            // 300, 5, 6, 8, 2, 4
-            // 290, 12, 9, 1
-            // =
-            // 290, 15, 6, 8, 2, 4
-            // 290 off in both, 10 in right, 2 in both, 3 in left, 6 off in both, 1 on in both, 7 on in left, 2 off in
-            //     both, 4 on in left
-            if(totalLeft < totalRight)
-            {
-                onLeft = !onLeft;
-                skip += totalLeft - idx;
-                idx = totalLeft;
-                if(on != (onLeft || onRight)) {
-                    packing.add((short) skip);
-                    skip = 0;
-                    on = !on;
-                }
-                elemLeft++;
-            }
-            else if(totalLeft == totalRight)
-            {
-                onLeft = !onLeft;
-                onRight = !onRight;
-                skip += totalLeft - idx;
-                idx = totalLeft;
-                if(on != (onLeft || onRight)) {
-                    packing.add((short) skip);
-                    skip = 0;
-                    on = !on;
-                }
-                elemLeft++;
-                elemRight++;
-
-            }
-            else
-            {
-                onRight = !onRight;
-                skip += totalRight - idx;
-                idx = totalRight;
-                if(on != (onLeft || onRight)) {
-                    packing.add((short) skip);
-                    skip = 0;
-                    on = !on;
-                }
-                elemRight++;
-            }
-        }
-        return packing.toArray();
-    }
-
-    /**
-     * Given two packed short arrays, left and right, this produces a packed short array that encodes "on" for any cell
-     * that was "on" in both left and in right, and encodes "off" for cells that were off in either array. This method
-     * does not do any unpacking (which can be somewhat computationally expensive) and so should be strongly preferred
-     * when finding the intersection of two pieces of packed data.
-     * @param left A packed array such as one produced by pack()
-     * @param right A packed array such as one produced by pack()
-     * @return A packed array that encodes "on" for all cells that were "on" in both left and right
-     */
-    public static short[] intersectPacked(short[] left, short[] right)
-    {
-        if(left.length == 0 || right.length == 0)
-            return ALL_WALL;
-        IntVLA packing = new IntVLA(64);
-        boolean on = false, onLeft = false, onRight = false;
-        int idx = 0, skip = 0, elemLeft = 0, elemRight = 0, totalLeft = 0, totalRight = 0;
-        while ((elemLeft < left.length && elemRight < right.length) && idx <= 0xffff) {
-            if (elemLeft >= left.length) {
-                totalLeft = 0xffff;
-                onLeft = false;
-            }
-            else if(totalLeft <= idx) {
-                totalLeft += left[elemLeft] & 0xffff;
-            }
-            if(elemRight >= right.length) {
-                totalRight = 0xffff;
-                onRight = false;
-            }
-            else if(totalRight <= idx) {
-                totalRight += right[elemRight] & 0xffff;
-            }
-            // 300, 5, 6, 8, 2, 4
-            // 290, 12, 9, 1
-            // =
-            // 300, 2, 9, 1
-            // 300 off, 2 on, 9 off, 1 on
-            if(totalLeft < totalRight)
-            {
-                onLeft = !onLeft;
-                skip += totalLeft - idx;
-                idx = totalLeft;
-                if(on != (onLeft && onRight)) {
-                    packing.add((short) skip);
-                    skip = 0;
-                    on = !on;
-                }
-                elemLeft++;
-            }
-            else if(totalLeft == totalRight)
-            {
-                onLeft = !onLeft;
-                onRight = !onRight;
-                skip += totalLeft - idx;
-                idx = totalLeft;
-                if(on != (onLeft && onRight)) {
-                    packing.add((short) skip);
-                    skip = 0;
-                    on = !on;
-                }
-                elemLeft++;
-                elemRight++;
-
-            }
-            else
-            {
-                onRight = !onRight;
-                skip += totalRight - idx;
-                idx = totalRight;
-                if(on != (onLeft && onRight)) {
-                    packing.add((short) skip);
-                    skip = 0;
-                    on = !on;
-                }
-                elemRight++;
-            }
-        }
-        return packing.toArray();
-    }
-
-    /**
-     * Given one packed short array, this produces a packed short array that is the exact opposite of the one passed in,
-     * that is, every "on" cell becomes "off" and every "off" cell becomes "on", including cells that were "off" because
-     * they were beyond the boundaries of the original 2D array passed to pack() or a similar method. This method does
-     * not do any unpacking (which can be somewhat computationally expensive), and actually requires among the lowest
-     * amounts of computation to get a result of any methods in RegionPacker. However, because it will cause cells to be
-     * considered "on" that would cause an exception if directly converted to x,y positions and accessed in the source
-     * 2D array, this method should primarily be used in conjunction with operations such as intersectPacked(), or have
-     * the checking for boundaries handled internally by unpack() or related methods such as unpackMultiDouble().
-     * @param original A packed array such as one produced by pack()
-     * @return A packed array that encodes "on" all cells that were "off" in original
-     */
-    public static short[] negatePacked(short[] original) {
-        if (original.length <= 1) {
-            return ALL_ON;
-        }
-        if (original[0] == 0) {
-            short[] copy = new short[original.length - 2];
-            System.arraycopy(original, 1, copy, 0, original.length - 2);
-            return copy;
-        }
-        short[] copy = new short[original.length + 2];
-        copy[0] = 0;
-        System.arraycopy(original, 0, copy, 1, original.length);
-        copy[copy.length - 1] = (short) (0xFFFF - covered(copy));
-        return copy;
-    }
-
-    /**
-     * Given two packed short arrays, left and right, this produces a packed short array that encodes "on" for any cell
-     * that was "on" in left but "off" in right, and encodes "off" for cells that were "on" in right or "off" in left.
-     * This method does not do any unpacking (which can be somewhat computationally expensive) and so should be strongly
-     * preferred when finding a region of one packed array that is not contained in another packed array.
-     * @param left A packed array such as one produced by pack()
-     * @param right A packed array such as one produced by pack()
-     * @return A packed array that encodes "on" for all cells that were "on" in left and "off" in right
-     */
-    public static short[] differencePacked(short[] left, short[] right)
-    {
-        if(left.length <= 1)
-            return ALL_WALL;
-        if(right.length <= 1)
-            return left;
-        IntVLA packing = new IntVLA(64);
-        boolean on = false, onLeft = false, onRight = false;
-        int idx = 0, skip = 0, elemLeft = 0, elemRight = 0, totalLeft = 0, totalRight = 0;
-        while ((elemLeft < left.length || elemRight < right.length) && idx <= 0xffff) {
-            if (elemLeft >= left.length) {
-                totalLeft = 0xffff;
-                onLeft = false;
-            }
-            else if(totalLeft <= idx) {
-                totalLeft += left[elemLeft] & 0xffff;
-            }
-            if(elemRight >= right.length) {
-                totalRight = 0xffff;
-                onRight = false;
-            }
-            else if(totalRight <= idx) {
-                totalRight += right[elemRight] & 0xffff;
-            }
-            if(totalLeft < totalRight)
-            {
-                onLeft = !onLeft;
-                skip += totalLeft - idx;
-                idx = totalLeft;
-                if(on != (onLeft && !onRight)) {
-                    packing.add((short) skip);
-                    skip = 0;
-                    on = !on;
-                }
-                elemLeft++;
-            }
-            else if(totalLeft == totalRight)
-            {
-                onLeft = !onLeft;
-                onRight = !onRight;
-                skip += totalLeft - idx;
-                idx = totalLeft;
-                if(on != (onLeft && !onRight)) {
-                    packing.add((short) skip);
-                    skip = 0;
-                    on = !on;
-                }
-                elemLeft++;
-                elemRight++;
-
-            }
-            else
-            {
-                onRight = !onRight;
-                skip += totalRight - idx;
-                idx = totalRight;
-                if(on != (onLeft && !onRight)) {
-                    packing.add((short) skip);
-                    skip = 0;
-                    on = !on;
-                }
-                elemRight++;
-            }
-        }
-        return packing.toArray();
-    }
-
-    /**
-     * Given two packed short arrays, left and right, this produces a packed short array that encodes "on" for any cell
-     * that was "on" only in left or only in right, but not a cell that was "off" in both or "on" in both. This method
-     * does not do any unpacking (which can be somewhat computationally expensive) and so should be strongly preferred
-     * when performing an exclusive-or operation on two pieces of packed data.
-     * <br>
-     * Could more-correctly be called exclusiveDisjunctionPacked to match the other terms, but... seriously?
-     * @param left A packed array such as one produced by pack()
-     * @param right A packed array such as one produced by pack()
-     * @return A packed array that encodes "on" for all cells such that left's cell ^ right's cell returns true
-     */
-    public static short[] xorPacked(short[] left, short[] right)
-    {
-        if(left.length == 0)
-            return right;
-        if(right.length == 0)
-            return left;
-        IntVLA packing = new IntVLA(64);
-        boolean on = false, onLeft = false, onRight = false;
-        int idx = 0, skip = 0, elemLeft = 0, elemRight = 0, totalLeft = 0, totalRight = 0;
-        while ((elemLeft < left.length || elemRight < right.length) && idx <= 0xffff) {
-            if (elemLeft >= left.length) {
-                totalLeft = 0xffff;
-                onLeft = false;
-            }
-            else if(totalLeft <= idx) {
-                totalLeft += left[elemLeft] & 0xffff;
-            }
-            if(elemRight >= right.length) {
-                totalRight = 0xffff;
-                onRight = false;
-            }
-            else if(totalRight <= idx) {
-                totalRight += right[elemRight] & 0xffff;
-            }
-            // 300, 5, 6, 8, 2, 4
-            // 290, 12, 9, 1
-            // =
-            // 290, 15, 6, 8, 2, 4
-            // 290 off in both, 10 in right, 2 in both, 3 in left, 6 off in both, 1 on in both, 7 on in left, 2 off in
-            //     both, 4 on in left
-            if(totalLeft < totalRight)
-            {
-                onLeft = !onLeft;
-                skip += totalLeft - idx;
-                idx = totalLeft;
-                if(on != (onLeft ^ onRight)) {
-                    packing.add((short) skip);
-                    skip = 0;
-                    on = !on;
-                }
-                elemLeft++;
-            }
-            else if(totalLeft == totalRight)
-            {
-                onLeft = !onLeft;
-                onRight = !onRight;
-                skip += totalLeft - idx;
-                idx = totalLeft;
-                if(on != (onLeft ^ onRight)) {
-                    packing.add((short) skip);
-                    skip = 0;
-                    on = !on;
-                }
-                elemLeft++;
-                elemRight++;
-
-            }
-            else
-            {
-                onRight = !onRight;
-                skip += totalRight - idx;
-                idx = totalRight;
-                if(on != (onLeft ^ onRight)) {
-                    packing.add((short) skip);
-                    skip = 0;
-                    on = !on;
-                }
-                elemRight++;
-            }
-        }
-        return packing.toArray();
-    }
-
     public EWAHCompressedBitmap32 packOne(int... coordinates)
     {
         EWAHCompressedBitmap32 bmp = new EWAHCompressedBitmap32();
         bmp.set(curve.distance(coordinates));
         return bmp;
     }
+
+    /**
+     * Given an int distance to travel down the space-filling curve given as this RegionPacker's CurveStrategy, returns
+     * a new packed bitmap that encodes only the point at that distance.
+     * @param distance a space-filling curve index using this RegionPacker's CurveStrategy.
+     * @return a new packed bitmap encoding only the point with the given distance along this space-filling curve
+     */
     public EWAHCompressedBitmap32 packOneCurve(int distance)
     {
         EWAHCompressedBitmap32 bmp = new EWAHCompressedBitmap32();
         bmp.set(distance);
         return bmp;
     }
+
+    /**
+     * Given an array or vararg of int arrays for points, where each internal array must have length equal to the number
+     * of dimensions in this RegionPacker's CurveStrategy, returns a new packed bitmap that encodes only those points.
+     * @param points an array or vararg of int arrays that each defines a point; there can be any number of arrays but
+     *               each inner array must match the curve's dimension count
+     * @return a new packed bitmap encoding only the given points
+     */
     public EWAHCompressedBitmap32 packSeveral(int[]... points)
     {
         int[] distances = new int[points.length];
         for (int i = 0; i < points.length; i++) {
             distances[i] = curve.distance(points[i]);
         }
-        return EWAHCompressedBitmap32.bitmapOf(distances);
-    }
-    public EWAHCompressedBitmap32 packSeveralCurve(int... distances)
-    {
+        Arrays.sort(distances);
         return EWAHCompressedBitmap32.bitmapOf(distances);
     }
 
+    /**
+     * Given an array or vararg of space-filling curve indices, returns a new packed bitmap that encodes only the points
+     * corresponding to the distances traveled for each index.
+     * @param distances an array or vararg of space-filling curve indices
+     * @return a new packed bitmap encoding only the points with the given distances along this space-filling curve
+     */
+    public EWAHCompressedBitmap32 packSeveralCurve(int... distances)
+    {
+        int[] distances2 = new int[distances.length];
+        System.arraycopy(distances, 0, distances2, 0, distances.length);
+        Arrays.sort(distances2);
+        return EWAHCompressedBitmap32.bitmapOf(distances2);
+    }
+
+    /**
+     * Given a packed bitmap and an array or vararg of coordinates that must have length equal to the number of
+     * dimensions in this RegionPacker's CurveStrategy, returns a new packed bitmap that encodes the given point as "on"
+     * in addition to any contents of packed.
+     * Copies packed and does not modify the original; to add to packed bitmaps in place, you can use the set() method.
+     * @param packed a packed bitmap to copy and add another point to
+     * @param coordinates an array or vararg of coordinates that defines a point; must match the curve's dimension count
+     * @return a new packed bitmap encoding a copy of packed's data and also the point with the given coordinates
+     */
     public EWAHCompressedBitmap32 insertOne(EWAHCompressedBitmap32 packed, int... coordinates)
     {
         EWAHCompressedBitmap32 next = copy(packed);
         next.set(curve.distance(coordinates));
         return next;
     }
+
+    /**
+     * Given a packed bitmap and an int distance to travel down the space-filling curve given as this RegionPacker's
+     * CurveStrategy, returns a new packed bitmap that encodes the point at that distance as "on" in addition to any
+     * contents of packed.
+     * Copies packed and does not modify the original; to add to packed bitmaps in place, you can use the set() method.
+     * @param packed a packed bitmap to copy and add another point to
+     * @param distance a space-filling curve index using this RegionPacker's CurveStrategy.
+     * @return a new packed bitmap encoding a copy of packed's data and also the point with the given distance along
+     * this space-filling curve
+     */
     public EWAHCompressedBitmap32 insertOneCurve(EWAHCompressedBitmap32 packed, int distance)
     {
         EWAHCompressedBitmap32 next = copy(packed);
@@ -1404,152 +1156,100 @@ public class RegionPacker {
         return next;
     }
 
+    /**
+     * Given a packed bitmap and an array or vararg of int arrays for points, where each internal array must have length
+     * equal to the number of dimensions in this RegionPacker's CurveStrategy, returns a new packed bitmap that encodes
+     * those points in addition to any contents of packed.
+     * Copies packed and does not modify the original; to add to packed bitmaps in place, you can use the set() method.
+     * @param packed a packed bitmap to copy and add the given points to
+     * @param points an array or vararg of int arrays that each defines a point; there can be any number of arrays but
+     *               each inner array must match the curve's dimension count
+     * @return a new packed bitmap encoding a copy of packed's data and also the given points
+     */
     public EWAHCompressedBitmap32 insertSeveral(EWAHCompressedBitmap32 packed, int[]... points)
     {
         return packed.or(packSeveral(points));
     }
 
+    /**
+     * Given a packed bitmap and an array or vararg of space-filling curve indices, returns a new packed bitmap that
+     * encodes the points corresponding to the distances traveled for each index in addition to any contents of packed.
+     * Copies packed and does not modify the original; to add to packed bitmaps in place, you can use the set() method.
+     * @param packed a packed bitmap to copy and add points to
+     * @param distances an array or vararg of space-filling curve indices
+     * @return a new packed bitmap encoding a copy of packed's data and also the points with the given distances along
+     * this space-filling curve
+     */
     public EWAHCompressedBitmap32 insertSeveralCurve(EWAHCompressedBitmap32 packed, int... distances)
     {
         return packed.or(packSeveralCurve(distances));
     }
+
     /**
-     * Given one packed short array, original, and a space-filling curve index, hilbert, this produces a packed short
-     * array that encodes "on" for any cell that was "on" in original, always encodes "on" for the position referred
-     * to by hilbert, and encodes "off" for cells that were "off" in original and are not the cell hilbert refers to.
-     * This method does not do any unpacking (which can be somewhat computationally expensive) and so should be strongly
-     * preferred when finding a region of one packed array that is not contained in another packed array.
-     * @param original A packed array such as one produced by pack()
-     * @param index A space-filling curve index that should be inserted into the result
-     * @return A packed array that encodes "on" for all cells that are "on" in original or correspond to index
+     * Given a packed bitmap and an array or vararg of coordinates that must have length equal to the number of
+     * dimensions in this RegionPacker's CurveStrategy, returns a new packed bitmap that ensures the given point is
+     * "off" after including any contents of packed.
+     * Copies packed and does not modify the original; to remove from packed bitmaps destructively, you can use the
+     * clear() method.
+     * @param packed a packed bitmap to copy and remove a point from
+     * @param coordinates an array or vararg of coordinates that defines a point; must match the curve's dimension count
+     * @return a new packed bitmap encoding a copy of packed's data but not the point with the given coordinates
      */
-    public static short[] insertPacked(short[] original, short index)
+    public EWAHCompressedBitmap32 removeOne(EWAHCompressedBitmap32 packed, int... coordinates)
     {
-        return unionPacked(original, new short[]{index, 1});
-    }
-    /**
-     * Given one packed short array, original, and a position as x,y numbers, this produces a packed short array
-     * that encodes "on" for any cell that was "on" in original, always encodes "on" for the position referred
-     * to by x and y, and encodes "off" for cells that were "off" in original and are not the cell x and y refer to.
-     * This method does not do any unpacking (which can be somewhat computationally expensive) and so should be strongly
-     * preferred when finding a region of one packed array that is not contained in another packed array.
-     * @param original A packed array such as one produced by pack()
-     * @param x The x position at which to insert the "on" cell
-     * @param y The y position at which to insert the "on" cell
-     * @return A packed array that encodes "on" for all cells that are "on" in original or correspond to x,y
-     */
-    public static short[] insertPacked(short[] original, int x, int y)
-    {
-        return unionPacked(original, new short[]{(short)posToHilbert(x, y), 1});
+        EWAHCompressedBitmap32 next = copy(packed);
+        next.clear(curve.distance(coordinates));
+        return next;
     }
 
     /**
-     * Given one packed short array, original, and a number of Hilbert Curve indices, hilbert, this produces a packed
-     * short array that encodes "on" for any cell that was "on" in original, always encodes "on" for the position
-     * referred to by any element of hilbert, and encodes "off" for cells that were "off" in original and are not in any
-     * cell hilbert refers to. This method does not do any unpacking (which can be somewhat computationally expensive)
-     * and so should be strongly preferred when you have several Hilbert Curve indices, possibly nearby each other but
-     * just as possibly not, that you need inserted into a packed array.
-     * <br>
-     *     NOTE: this may not produce an optimally packed result, though the difference in memory consumption is likely
-     *     to be exceedingly small unless there are many nearby elements in hilbert (which may be a better use case for
-     *     unionPacked() anyway).
-     * @param original A packed array such as one produced by pack()
-     * @param hilbert an array or vararg of Hilbert Curve indices that should be inserted into the result
-     * @return A packed array that encodes "on" for all cells that are "on" in original or are contained in hilbert
+     * Given a packed bitmap and an int distance to travel down the space-filling curve given as this RegionPacker's
+     * CurveStrategy, returns a new packed bitmap that ensures the point at that distance is "off" after including any
+     * contents of packed.
+     * Copies packed and does not modify the original; to remove from packed bitmaps destructively, you can use the
+     * clear() method.
+     * @param packed a packed bitmap to copy and remove a point from
+     * @param distance a space-filling curve index using this RegionPacker's CurveStrategy.
+     * @return a new packed bitmap encoding a copy of packed's data but not the point with the given distance along
+     * this space-filling curve
      */
-    public static short[] insertSeveralPacked(short[] original, int... hilbert)
+    public EWAHCompressedBitmap32 removeOneCurve(EWAHCompressedBitmap32 packed, int distance)
     {
-        return unionPacked(original, packSeveral(hilbert));
-    }
-    /**
-     * Given one packed short array, original, and a number of Coords, points, this produces a packed
-     * short array that encodes "on" for any cell that was "on" in original, always encodes "on" for the position
-     * referred to by any element of points, and encodes "off" for cells that were "off" in original and are not in any
-     * cell points refers to. This method does not do any unpacking (which can be somewhat computationally expensive)
-     * and so should be strongly preferred when you have several Coords, possibly nearby each other but
-     * just as possibly not, that you need inserted into a packed array.
-     * <br>
-     *     NOTE: this may not produce an optimally packed result, though the difference in memory consumption is likely
-     *     to be exceedingly small unless there are many nearby elements in hilbert (which may be a better use case for
-     *     unionPacked() anyway).
-     * @param original A packed array such as one produced by pack()
-     * @param points an array or vararg of Coords that should be inserted into the result
-     * @return A packed array that encodes "on" for all cells that are "on" in original or are contained in hilbert
-     */
-    public static short[] insertSeveralPacked(short[] original, Coord... points)
-    {
-        return unionPacked(original, packSeveral(points));
-    }
-    /**
-     * Given one packed short array, original, and a Hilbert Curve index, hilbert, this produces a packed short array
-     * that encodes "on" for any cell that was "on" in original, unless it was the position referred to by hilbert, and
-     * encodes "off" for cells that were "off" in original or are the cell hilbert refers to.
-     * This method does not do any unpacking (which can be somewhat computationally expensive) and so should be strongly
-     * preferred when finding a region of one packed array that is not contained in another packed array.
-     * @param original A packed array such as one produced by pack()
-     * @param hilbert A Hilbert Curve index that should be removed from the result
-     * @return A packed array that encodes "on" for all cells that are "on" in original and don't correspond to hilbert
-     */
-    public static short[] removePacked(short[] original, short hilbert)
-    {
-        return differencePacked(original, new short[]{hilbert, 1});
-    }
-    /**
-     * Given one packed short array, original, and a position as x,y numbers, this produces a packed short array that
-     * encodes "on" for any cell that was "on" in original, unless it was the position referred to by x and y, and
-     * encodes "off" for cells that were "off" in original or are the cell x and y refer to.
-     * This method does not do any unpacking (which can be somewhat computationally expensive) and so should be strongly
-     * preferred when finding a region of one packed array that is not contained in another packed array.
-     * @param original A packed array such as one produced by pack()
-     * @param x The x position at which to remove any "on" cell
-     * @param y The y position at which to remove any "on" cell
-     * @return A packed array that encodes "on" for all cells that are "on" in original and don't correspond to x,y
-     */
-    public static short[] removePacked(short[] original, int x, int y)
-    {
-        int dist = posToHilbert(x, y);
-        return differencePacked(original, new short[]{(short)dist, 1});
+        EWAHCompressedBitmap32 next = copy(packed);
+        next.clear(distance);
+        return next;
     }
 
     /**
-     * Given one packed short array, original, and a number of Hilbert Curve indices, hilbert, this produces a packed
-     * short array that encodes "on" for any cell that was "on" in original, unless it was a position referred to by
-     * hilbert, and encodes "off" for cells that were "off" in original and are a cell hilbert refers to. This method
-     * does not do any unpacking (which can be somewhat computationally expensive) and so should be strongly preferred
-     * when you have several Hilbert Curve indices, possibly nearby each other but just as possibly not, that you need
-     * removed from a packed array.
-     * <br>
-     *     NOTE: this may not produce an optimally packed result, though the difference in memory consumption is likely
-     *     to be exceedingly small unless there are many nearby elements in hilbert (which may be a better use case for
-     *     differencePacked() anyway).
-     * @param original A packed array such as one produced by pack()
-     * @param hilbert an array or vararg of Hilbert Curve indices that should be inserted into the result
-     * @return A packed array that encodes "on" for all cells that are "on" in original and aren't contained in hilbert
+     * Given a packed bitmap and an array or vararg of int arrays for points, where each internal array must have length
+     * equal to the number of dimensions in this RegionPacker's CurveStrategy, returns a new packed bitmap that ensures
+     * those points are "off" after including any contents of packed.
+     * Copies packed and does not modify the original; to remove from packed bitmaps destructively, you can use the
+     * clear() method.
+     * @param packed a packed bitmap to copy and remove the given points from
+     * @param points an array or vararg of int arrays that each defines a point; there can be any number of arrays but
+     *               each inner array must match the curve's dimension count
+     * @return a new packed bitmap encoding a copy of packed's data but not the given points
      */
-    public static short[] removeSeveralPacked(short[] original, int... hilbert)
+    public EWAHCompressedBitmap32 removeSeveral(EWAHCompressedBitmap32 packed, int[]... points)
     {
-        return differencePacked(original, packSeveral(hilbert));
+        return packed.andNot(packSeveral(points));
     }
 
     /**
-     * Given one packed short array, original, and a number of Hilbert Curve indices, hilbert, this produces a packed
-     * short array that encodes "on" for any cell that was "on" in original, unless it was a position referred to by
-     * hilbert, and encodes "off" for cells that were "off" in original and are a cell hilbert refers to. This method
-     * does not do any unpacking (which can be somewhat computationally expensive) and so should be strongly preferred
-     * when you have several Hilbert Curve indices, possibly nearby each other but just as possibly not, that you need
-     * removed from a packed array.
-     * <br>
-     *     NOTE: this may not produce an optimally packed result, though the difference in memory consumption is likely
-     *     to be exceedingly small unless there are many nearby elements in hilbert (which may be a better use case for
-     *     differencePacked() anyway).
-     * @param original A packed array such as one produced by pack()
-     * @param points an array or vararg of Coords that should be inserted into the result
-     * @return A packed array that encodes "on" for all cells that are "on" in original and aren't contained in points
+     * Given a packed bitmap and an array or vararg of space-filling curve indices, returns a new packed bitmap that
+     * ensures the points corresponding to the distances traveled for each index are "off" after including any contents
+     * of packed.
+     * Copies packed and does not modify the original; to remove from packed bitmaps destructively, you can use the
+     * clear() method.
+     * @param packed a packed bitmap to copy and remove points from
+     * @param distances an array or vararg of space-filling curve indices
+     * @return a new packed bitmap encoding a copy of packed's data but not the points with the given distances along
+     * this space-filling curve
      */
-    public static short[] removeSeveralPacked(short[] original, Coord... points)
+    public EWAHCompressedBitmap32 removeSeveralCurve(EWAHCompressedBitmap32 packed, int... distances)
     {
-        return differencePacked(original, packSeveral(points));
+        return packed.andNot(packSeveralCurve(distances));
     }
 
     /**
@@ -1583,35 +1283,6 @@ public class RegionPacker {
             cs[i] = Coord.get(hilbertX[distances[i]], hilbertY[distances[i]]);
         }
         return cs;
-    }
-    /**
-     * Gets a single randomly chosen position that is "on" in the given packed array, without unpacking it, and returns
-     * it as a Coord or returns null of the array is empty. Random numbers are generated by the rng parameter.
-     * More efficient in most cases than randomSample(), and will always return at least one Coord for non-empty arrays.
-     * @param packed a short[] returned by pack() or one of the sub-arrays in what is returned by packMulti(); must
-     *               not be null (this method does not check).
-     * @param rng the random number generator used to decide random factors
-     * @return a Coord corresponding to a random "on" cell in packed
-     */
-    public static Coord singleRandom(short[] packed, RNG rng)
-    {
-        int counted = count(packed);
-        if(counted == 0)
-            return null;
-        int r = rng.nextInt(counted);
-        int c = 0, idx = 0;
-        boolean on = false;
-        for (int i = 0; i < packed.length; on = !on, idx += packed[i] & 0xFFFF, i++) {
-            if (on) {
-                if(c + (packed[i] & 0xFFFF) > r)
-                {
-                    idx += r - c;
-                    return Coord.get(hilbertX[idx], hilbertY[idx]);
-                }
-                c += packed[i] & 0xFFFF;
-            }
-        }
-        return null;
     }
 
     /**
@@ -1655,16 +1326,42 @@ public class RegionPacker {
         return coords;
     }
 
+    /**
+     * Given a packed bitmap and an RNG, gets a point corresponding to a random "on" position in packed. Returns an int
+     * array representing the point, or null if packed is null or has no "on" positions.
+     * @param packed a packed bitmap
+     * @param random an RNG object that can be seeded
+     * @return a random point corresponding to an "on" position in packed, or null if positions is null or empty
+     */
     public int[] singleRandom(EWAHCompressedBitmap32 packed, RNG random)
     {
-        int[] arr = packed.toArray();
-        int n = random.nextInt(arr.length);
-        return curve.point(arr[n]);
+        if(packed == null || packed.isEmpty())
+            return null;
+        int n = random.nextInt(packed.cardinality());
+        EWAHCompressedBitmap32 comp = packOneCurve(n);
+        int found = packed.compose(comp).getFirstSetBit();
+        if(found >= 0)
+            return curve.point(found);
+        else
+            return null;
     }
-    public int[] singleRandom(int[] unpacked, RNG random)
+
+    /**
+     * If you expect to get many random values one at a time from a packed bitmap, you can get all positions that are
+     * "on" with this class' positionsCurve method or the packed bitmap's toArray method. In either case, you can get
+     * a random point that packed bitmap encoded by passing that resulting int array and an RNG to this method. Returns
+     * an int array representing the point, or null if positions is null or empty.
+     * @param positions the positions in a packed bitmap as obtained by this.positionsCurve() or packed.toArray()
+     * @param random an RNG object that can be seeded
+     * @return a random point corresponding to an "on" position in the original packed bitmap, or null if positions is
+     * null or empty
+     */
+    public int[] singleRandom(int[] positions, RNG random)
     {
-        int n = random.nextInt(unpacked.length);
-        return curve.point(unpacked[n]);
+        if(positions == null || positions.length == 0)
+            return null;
+        int n = random.nextInt(positions.length);
+        return curve.point(positions[n]);
     }
 
     /**
