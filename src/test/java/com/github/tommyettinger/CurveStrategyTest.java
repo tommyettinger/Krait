@@ -255,14 +255,13 @@ public class CurveStrategyTest {
             assertEquals(1, Math.abs(pt[0] - pt2[0]) + Math.abs(pt[1] - pt2[1]) + Math.abs(pt[2] - pt2[2]));
             pt = pt2;
         }
-        System.out.println();
     }
 
     @Test
-    public void testPukaHilbert()
+    public void testPukaHilbert40()
     {
         System.out.println("Puka-Hilbert Curve");
-        PukaHilbertStrategy ph = new PukaHilbertStrategy();
+        PukaHilbert40Strategy ph = new PukaHilbert40Strategy();
         System.out.println("Max distance: " + Long.toHexString(ph.maxDistance));
         int[] pt = ph.point(0), pt2;
         printlnPoint("Puka-Hilbert position 0", pt);
@@ -277,9 +276,71 @@ public class CurveStrategyTest {
             pt2 = ph.point(i);
             assertEquals(1, Math.abs(pt[0] - pt2[0]) + Math.abs(pt[1] - pt2[1]) + Math.abs(pt[2] - pt2[2]));
             pt = pt2;
+            int d = ph.distance(pt);
+            if(i != d)
+            {
+                ph.distance(pt);
+                printPoint(pt);
+                System.out.println(" -> " + i + " but gives " + d);
+            }
         }
-        System.out.println();
     }
+
+    @Test
+    public void testPukaHilbert1280()
+    {
+        System.out.println("Large Puka-Hilbert Curve");
+        PukaHilbert1280Strategy ph = new PukaHilbert1280Strategy();
+        System.out.println("Max distance: " + Long.toHexString(ph.maxDistance));
+        int[] pt = ph.point(0), pt2;
+        printlnPoint("Puka-Hilbert position 0", pt);
+        pt = ph.point(1);
+        printlnPoint("Puka-Hilbert position 1", pt);
+        pt = ph.point(4);
+        printlnPoint("Puka-Hilbert position 4", pt);
+        pt = ph.point(-1);
+        printlnPoint("Puka-Hilbert position end", pt);
+
+        pt = ph.point(0);
+        int cx, cy, cz;
+        for (int i = 1; i < ph.maxDistance; i++) {
+            pt2 = ph.point(i);
+            cx = ph.coordinate(i, 0);
+            cy = ph.coordinate(i, 1);
+            cz = ph.coordinate(i, 2);
+            if(1 != Math.abs(pt[0] - pt2[0]) + Math.abs(pt[1] - pt2[1]) + Math.abs(pt[2] - pt2[2]))
+                assertEquals("BAD BAD " + i + "!!!", "");
+            assertEquals(pt2[0], cx);
+            assertEquals(pt2[1], cy);
+            assertEquals(pt2[2], cz);
+            pt = pt2;
+        }
+    }
+    @Test
+    public void testPukaHilbert1280Problems()
+    {
+        System.out.println("Large Puka-Hilbert Curve Problems");
+        PukaHilbert1280Strategy ph = new PukaHilbert1280Strategy();
+        System.out.println("Max distance: " + Long.toHexString(ph.maxDistance));
+        int[] pt = ph.point(0), pt2;
+        pt = ph.point(0);
+        int d;
+//        for (int i = 1; i < ph.maxDistance; i++) {
+        for (int i = 1; i < 65000; i++) {
+            pt2 = ph.point(i);
+            assertEquals(1, Math.abs(pt[0] - pt2[0]) + Math.abs(pt[1] - pt2[1]) + Math.abs(pt[2] - pt2[2]));
+            pt = pt2;
+            d = ph.distance(pt);
+            if(i != d)
+            {
+                ph.distance(pt);
+                printPoint(pt);
+                System.out.println(" -> " + i + " but gives " + d);
+            }
+        }
+
+    }
+
     @Test
     public void testGray() {
         for (int i = 0; i < 70; i++) {

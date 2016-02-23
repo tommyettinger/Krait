@@ -140,6 +140,12 @@ public class HilbertGeneralStrategy extends CurveStrategy {
         }
         return pt;
     }
+    private int[] toPoint(int... coordinates)
+    {
+        int[] pt = new int[coordinates.length];
+        System.arraycopy(coordinates, 0, pt, 0, coordinates.length);
+        return pt;
+    }
 
     /**
      * Given a distance to travel along this space-filling curve, gets the corresponding point as an array of int
@@ -176,7 +182,7 @@ public class HilbertGeneralStrategy extends CurveStrategy {
                 case 16:
                     return toPoint(sVals[distance]);
                 default:
-                    return iVals[distance];
+                    return toPoint(iVals[distance]);
             }
         }
         return HilbertUtility.distanceToPoint(bits, DIMENSION, distance);
