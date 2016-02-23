@@ -36,12 +36,13 @@
  */
 package it.unimi.dsi.fastutil.objects;
 
-import java.util.*;
+import it.unimi.dsi.fastutil.Stack;
 
+import java.util.*;
 /** An abstract class providing basic methods for lists implementing a type-specific list interface.
  *
  * <P>As an additional bonus, this class implements on top of the list operations a type-specific stack. */
-public abstract class AbstractObjectList<K> extends AbstractObjectCollection<K> implements ObjectList<K>, java.util.Stack<K> {
+public abstract class AbstractObjectList<K> extends AbstractObjectCollection<K> implements ObjectList<K>, Stack<K> {
 	protected AbstractObjectList() {}
 
 	/** Ensures that the given index is nonnegative and not greater than the list size.
