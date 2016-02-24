@@ -97,7 +97,7 @@ public class PukaStrategy extends CurveStrategy {
      */
     @Override
     public int[] point(int distance) {
-        distance = (distance + maxDistance) % maxDistance;
+        distance = (distance >= maxDistance || distance < 0) ? maxDistance - 1 : distance;
         return new int[]{pukaX[distance], pukaY[distance], pukaZ[distance]};
     }
 
@@ -114,7 +114,7 @@ public class PukaStrategy extends CurveStrategy {
      */
     @Override
     public int[] alter(int[] coordinates, int distance) {
-        distance = (distance + maxDistance) % maxDistance;
+        distance = (distance >= maxDistance || distance < 0) ? maxDistance - 1 : distance;
         coordinates[0] = pukaX[distance];
         coordinates[1] = pukaY[distance];
         coordinates[2] = pukaZ[distance];
@@ -133,7 +133,7 @@ public class PukaStrategy extends CurveStrategy {
     @Override
     public int coordinate(int distance, int dimension) {
         dimension %= 3;
-        distance = (distance + maxDistance) % maxDistance;
+        distance = (distance >= maxDistance || distance < 0) ? maxDistance - 1 : distance;
 
         switch (dimension) {
             case 0:
@@ -169,7 +169,7 @@ public class PukaStrategy extends CurveStrategy {
      * @return a int array, containing the x, y, z, etc. coordinates as elements to match the length of dimensionality
      */
     public int[] pointRotated(int distance, int direction, int rotation) {
-        distance = (distance + maxDistance) % maxDistance;
+        distance = (distance >= maxDistance || distance < 0) ? maxDistance - 1 : distance;
         switch (4 * direction + rotation)
         {
             case 0:
@@ -235,7 +235,7 @@ public class PukaStrategy extends CurveStrategy {
      * @return the appropriate dimension's rotated coordinate for the point corresponding to distance traveled
      */
     public int coordinateRotated(int distance, int dimension, int direction, int rotation) {
-        distance = (distance + maxDistance) % maxDistance;
+        distance = (distance >= maxDistance || distance < 0) ? maxDistance - 1 : distance;
         switch (dimension) {
             case 0:
                 switch (4 * direction + rotation) {

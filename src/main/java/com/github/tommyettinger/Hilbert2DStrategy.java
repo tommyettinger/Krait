@@ -102,7 +102,7 @@ public class Hilbert2DStrategy extends CurveStrategy {
      */
     @Override
     public int[] point(int distance) {
-        distance = (distance + maxDistance) % maxDistance;
+        distance = (distance >= maxDistance || distance < 0) ? maxDistance - 1 : distance;
         if(stored)
         {
             switch (bits)
@@ -137,7 +137,7 @@ public class Hilbert2DStrategy extends CurveStrategy {
      */
     @Override
     public int[] alter(int[] coordinates, int distance) {
-        distance = (distance + maxDistance) % maxDistance;
+        distance = (distance >= maxDistance || distance < 0) ? maxDistance - 1 : distance;
         if(stored)
         {
             switch (bits)
@@ -177,7 +177,7 @@ public class Hilbert2DStrategy extends CurveStrategy {
     @Override
     public int coordinate(int distance, int dimension) {
         dimension %= 2;
-        distance = (distance + maxDistance) % maxDistance;
+        distance = (distance >= maxDistance || distance < 0) ? maxDistance - 1 : distance;
         if(stored)
         {
             switch (bits)
@@ -229,12 +229,12 @@ public class Hilbert2DStrategy extends CurveStrategy {
                 case 2:
                 case 3:
                 case 4:
-                    return bDist[coordinates[0] + (coordinates[1] << bits)];
+                    return bDist[coordinates[0] + (coordinates[1] << bits)] & 0xff;
                 case 5:
                 case 6:
                 case 7:
                 case 8:
-                    return sDist[coordinates[0] + (coordinates[1] << bits)];
+                    return sDist[coordinates[0] + (coordinates[1] << bits)] & 0xffff;
                 default:
                     return iDist[coordinates[0] + (coordinates[1] << bits)];
             }

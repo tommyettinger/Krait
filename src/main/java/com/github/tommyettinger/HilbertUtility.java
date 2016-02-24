@@ -12,9 +12,21 @@ public class HilbertUtility {
     /**
      * Finds the first power of two that is equal to or greater than n.
      * @param n the number to find the next power of two for
-     * @return the next power of two after or equal to n
+     * @return the next power of two after or equal to n, with a minimum of 2
      */
     public static int nextPowerOfTwo(int n)
+    {
+        n = (n < 2) ? 2 : n;
+        int highest = Integer.highestOneBit(n);
+        return  (highest == Integer.lowestOneBit(n)) ? highest : highest << 1;
+    }
+
+    /**
+     * Finds the first power of two that is equal to or greater than n.
+     * @param n the number to find the next power of two for
+     * @return the next power of two after or equal to n, with a minimum of 0
+     */
+    public static int nextPowerOfTwoExact(int n)
     {
         int highest = Integer.highestOneBit(n);
         return  (highest == Integer.lowestOneBit(n)) ? highest : highest << 1;
@@ -41,7 +53,7 @@ public class HilbertUtility {
     {
         if(v == 0)
             return v;
-        int m = Integer.numberOfTrailingZeros(nextPowerOfTwo(v)) + 1;
+        int m = Integer.numberOfTrailingZeros(nextPowerOfTwoExact(v)) + 1;
         int i = v;
         for (int j = 1; j < m; j++) {
             i ^= (v >>> j);

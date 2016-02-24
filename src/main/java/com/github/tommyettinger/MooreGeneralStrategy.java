@@ -4,14 +4,13 @@ import java.util.Arrays;
 
 /**
  * A CurveStrategy for a cyclical arrangement of n-dimensional Hilbert curves, each occupying a hypercube with power-of-
- * two side length (componentSideLength), but the space-filling curve they are arranged into can be stretched by an
- * integer factor (stretch) along one dimension (specified by stretchAxis) into a non-cubic shape. Total distance
- * through this Moore Curve must be no greater than 2^63 (in hex, 0x4000000000000000); this is determined by
- * ((componentSideLength * 2) ^ (the dimension count - 1)) * stretch * componentSideLength. If a non-power-of-two
- * componentSideLength is requested, the first greater power of two is used for a side length. If the
- * componentSideLength or stretch would be too large, this throws an exception. Moore Curves like the ones this
- * describes are useful when you need either the behavior of one dimension that can be stretched, or the behavior of a
- * looping pattern through the curve instead of the normal Hilbert movement from one corner to another.
+ * two sideLength, but the space-filling curve they are arranged into can be stretched by an integer factor (stretch)
+ * along one dimension (specified by stretchAxis) into a non-cubic shape. Total distance through this Moore Curve must
+ * be no greater than 2^63 (in hex, 0x4000000000000000); this is determined by pow((sideLength * 2), (the dimension
+ * count - 1)) * stretch * sideLength. If a non-power-of-two sideLength is requested, the first greater power of two is
+ * used for a side length. If the sideLength or stretch would be too large, this throws an exception. Moore Curves like
+ * the ones this describes are useful when you need either the behavior of one dimension that can be stretched, or the
+ * behavior of a looping pattern through the curve instead of the normal Hilbert movement from one corner to another.
  * Created by Tommy Ettinger on 2/11/2016.
  */
 public class MooreGeneralStrategy extends CurveStrategy {
@@ -23,22 +22,33 @@ public class MooreGeneralStrategy extends CurveStrategy {
     public final int DIMENSION;
 
     /**
-     * Constructs a MooreGeneralStrategy with 3 dimensions, componentSideLength 16, stretching axis 0 (x-axis), and
-     * stretch 2, which produces a cube with total side length 32. It will pre-calculate the 2^15 points of that Moore
-     * Curve and store their x coordinates, y coordinates, z coordinates, and distances in short arrays.
+     * Constructs a MooreGeneralStrategy with 3 dimensions, sideLength 32, stretching axis 0 (x-axis), and
+     * stretch 2, which produces a cube with total side length 64. It will pre-calculate the 2^15 points of the
+     * component Hilbert curves and store their x coordinates, y coordinates, z coordinates, and distances in short
+     * arrays, but will calculate anything related to the Moore curve as it goes, using the pre-calculated Hilbert Curve
+     * to speed things up.
      */
     public MooreGeneralStrategy()
     {
-        this(3, 32, 0, 2);
+        this(3, 16, 0, 2);
     }
 
     /**
      * Constructs a MooreGeneralStrategy with the specified dimension count and side length, potentially pre-
-     * calculating the Hilbert Curve to improve performance if the total length, sideLength ^ dimension, is no greater
-     * than 2 ^ 24.
-     * @param dimension the number of dimensions to use, all with equal length; must be between 2 and 31
-     * @param sideLength the length of a side, which will be rounded up to the next-higher power of two if it isn't
-     *                   already a power of two. sideLength ^ dimension must be no greater than 2^63.
+     * calculating the Hilbert Curve to improve performance if the length of the component Hilbert curves,
+     * pow(sideLength, dimension), is no greater than pow(2,20). The total length of this Moore curve, as determined by
+     * {@code pow(sideLength * 2, dimension) * stretch * sideLength}, must be no more than than pow(2, 30).
+     * <br>
+     * REMEMBER, sideLength refers to the component cubes' side length, not the dimensions of the Moore curve! Only if
+     * stretch is 2 will the Moore curve actually be a cube, and then the length of that cube's sides will be sideLength
+     * * 2; in all other cases the shape of the curve will be squat or tall.
+     * @param dimension the number of dimensions to use, all with equal length; must be between 2 and 30
+     * @param sideLength the length of a side of one of the internal Hilbert curves, which will be doubled for
+     *                   non-stretched axes and multiplied by stretch for the stretched axis; will be rounded up to the
+     *                   next-higher power of two if it isn't already a power of two.
+     * @param stretchAxis the dimension this Moore curve can stretch along, between 0 and (dimension - 1)
+     * @param stretch the integer amount to stretch this curve by along stretchAxis; a value of 2 results in a cubic
+     *                shape, a value of 1 results in a wide, flat shape, and values greater than 2 are tall
      */
     public MooreGeneralStrategy(int dimension, int sideLength, int stretchAxis, int stretch) {
         if(dimension > 31)
@@ -49,8 +59,8 @@ public class MooreGeneralStrategy extends CurveStrategy {
         if(stretchAxis < 0 || stretchAxis >= DIMENSION)
             throw new UnsupportedOperationException("stretchAxis " + stretchAxis + "is invalid for dimension count " +
                     dimension);
-        if(stretch < 0)
-            throw new UnsupportedOperationException("stretch " + stretch + " should not be negative");
+        if(stretch <= 0)
+            throw new UnsupportedOperationException("stretch " + stretch + " should be positive");
         if(sideLength <= 1)
         {
             sideLength = 2;
@@ -58,9 +68,9 @@ public class MooreGeneralStrategy extends CurveStrategy {
 
         side = HilbertUtility.nextPowerOfTwo(sideLength);
         maxDistance = (int) Math.pow((side * 2), (dimension - 1)) * stretch * side;
-        if(maxDistance > 0x40000000 || maxDistance < 0)
+        if(maxDistance <= 0)
             throw new UnsupportedOperationException("Moore Curve is too large or small, given dimension " + dimension +
-            ", componentSideLength " + side + ", stretchAxis " + stretchAxis + ", stretch " + stretch);
+            ", sideLength " + side + ", stretchAxis " + stretchAxis + ", stretch " + stretch);
         distanceByteSize = calculateByteSize();
         dimensionality = new int[DIMENSION];
         Arrays.fill(dimensionality, side * 2);
@@ -83,7 +93,7 @@ public class MooreGeneralStrategy extends CurveStrategy {
      */
     @Override
     public int[] point(int distance) {
-        distance = (distance + maxDistance) % maxDistance;
+        distance = (distance >= maxDistance || distance < 0) ? maxDistance - 1 : distance;
         int h = distance & innerMask;
         int sector = distance >>> innerBits, arrange = HilbertUtility.grayCode(sector * 2 / stretch);
         int[] minor = hilbert.point(h), pt = new int[DIMENSION];
@@ -112,7 +122,7 @@ public class MooreGeneralStrategy extends CurveStrategy {
      */
     @Override
     public int[] alter(int[] coordinates, int distance) {
-        distance = (distance + maxDistance) % maxDistance;
+        distance = (distance >= maxDistance || distance < 0) ? maxDistance - 1 : distance;
         int h = distance & innerMask;
         int sector = distance >>> innerBits, arrange = HilbertUtility.grayCode(sector * 2 / stretch);
         int[] minor = hilbert.point(h);
@@ -140,7 +150,7 @@ public class MooreGeneralStrategy extends CurveStrategy {
     @Override
     public int coordinate(int distance, int dimension) {
         dimension = (dimension + DIMENSION) % DIMENSION;
-        distance = (distance + maxDistance) % maxDistance;
+        distance = (distance >= maxDistance || distance < 0) ? maxDistance - 1 : distance;
         int h = distance & innerMask;
         int sector = distance >>> innerBits, arrange = HilbertUtility.grayCode(sector * 2 / stretch);
         int d = (stretchAxis + 1 + dimension) % DIMENSION;
