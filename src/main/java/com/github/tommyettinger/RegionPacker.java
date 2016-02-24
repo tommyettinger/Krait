@@ -4,7 +4,9 @@ import com.googlecode.javaewah.IntIterator;
 import com.googlecode.javaewah32.EWAHCompressedBitmap32;
 import it.unimi.dsi.fastutil.ints.*;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 
 /**
@@ -427,6 +429,47 @@ public class RegionPacker {
         return packed.toArray();
     }
 
+    public List<EWAHCompressedBitmap32> containing(int[] point, EWAHCompressedBitmap32... packedMany)
+    {
+        List<EWAHCompressedBitmap32> results = new ArrayList<EWAHCompressedBitmap32>(packedMany.length);
+        EWAHCompressedBitmap32 single = packOne(point);
+        for (int i = 0; i < packedMany.length; i++) {
+            if(single.intersects(packedMany[i]))
+                results.add(packedMany[i]);
+        }
+        return results;
+    }
+    /**
+     * Given a packed bitmap and a fraction (as a numerator and denominator), copies a portion of the positions in
+     * packed and returns the copy as a new packed bitmap. For every (denominator) positions in packed, (numerator) will
+     * be used, with slightly more than that fraction being used if the number of positions in packed does not divide
+     * evenly by denominator. The number of positions in the returned packed bitmap, if it has position count c, will be
+     * between {@code (c * numerator) / denominator} and {@code (c * numerator) / denominator + numerator}.
+     * Returns a new packed bitmap and does not modify packed.
+     * @param packed the packed bitmap to copy and get a fraction of
+     * @param numerator the numerator of the fraction to use; should be positive and less than denominator
+     * @param denominator the denominator of the fraction to use; should be positive and greater than numerator
+     * @return a new packed bitmap that encodes the specified fraction of positions from packed
+     */
+    public EWAHCompressedBitmap32 fraction(EWAHCompressedBitmap32 packed, int numerator, int denominator)
+    {
+        if(numerator >= denominator || denominator <= 0)
+            return copy(packed);
+        EWAHCompressedBitmap32 next = new EWAHCompressedBitmap32();
+        if(numerator <= 0)
+            return next;
+        IntIterator it = packed.intIterator();
+        int c = 0, i;
+        while (it.hasNext())
+        {
+            i = it.next();
+            if(c < numerator)
+                next.set(i);
+            c = (c + 1) % denominator;
+        }
+        return next;
+    }
+
     private static int clamp(int n, int min, int max)
     {
         return Math.min(Math.max(min, n), max - 1);
@@ -467,11 +510,11 @@ public class RegionPacker {
         }
     }
 
-    private void assignFlood(IntSortedSet values, IntSet checks, IntSet edge, IntSet needs, int[] pt, int[] bounds, int[][] movers)
+    private void assignFlood(IntSortedSet values, IntSet checks, IntSet edge, IntSet needs, int[] pt, int[][] movers)
     {
         int temp;
         for (int i = 0; i < movers.length; i++) {
-            temp = clampedDistanceTranslate(pt, bounds, movers[i]);
+            temp = clampedDistanceTranslate(pt, curve.dimensionality, movers[i]);
             if (needs.contains(temp) && checks.add(temp)) {
                 values.add(temp);
                 edge.add(temp);
@@ -515,6 +558,29 @@ public class RegionPacker {
             System.arraycopy(move, 0, movers[m++], 0, move.length);
         }
         return movers;
+    }
+
+    private int[][] expandMetric(Metric metric, int expansion)
+    {
+
+        if(metric == Metric.CHEBYSHEV) return expandChebyshev(expansion);
+        else if(metric == Metric.MANHATTAN && expansion <= 100) return expandManhattan(expansion);
+
+        int[] move = new int[curve.dimensionality.length];
+        if(expansion < 0) expansion = 0;
+        int side = expansion * 2 + 1, exp = (int)Math.pow(side, move.length), m = 0, run;
+        int[][] movers = new int[exp][move.length];
+        for (int i = 0; i < exp; i++)
+        {
+            run = 1;
+            for (int d = 0; d < move.length; d++) {
+                move[d] = ((i / run) % side) - expansion;
+                run *= side;
+            }
+            if(metric.withinGridDistance(expansion, move))
+                System.arraycopy(move, 0, movers[m++], 0, move.length);
+        }
+        return Arrays.copyOf(movers, m);
     }
     /**
      * Move all "on" positions in packed by the number of cells given in xMove and yMove, unless the move
@@ -578,30 +644,26 @@ public class RegionPacker {
 
 
     /**
-     * Expand each "on" position in packed to cover either a square/cube/hypercube or a
-     * diamond/octahedron/cross polytope (for 2D, 3D, and higher dimensions, respectively) depending on whether the
-     * chebyshev argument is true (producing a hypercube) or false (producing a cross polytope). The center of each cell
-     * and the cells with a Chebyshev or Manhattan distance (the former if chebyshev is true) of expansion or less
-     * included, unless the expansion would take a cell further than 0 or out of the appropriate dimension in bounds, in
-     * which case that cell is stopped at the edge.
+     * Expand each "on" position in packed to cover an n-dimensional region, one of square/cube/hypercube,
+     * diamond/octahedron/cross polytope, or circle/sphere/hypersphere (for 2D/3D/higher dimensions) depending on the
+     * metric parameter (CHEBYSHEV produces a square, MANHATTAN produces a diamond, while EUCLIDEAN and EUCLIDEAN_STRICT
+     * produce circles in 2D). The center of each cell and the cells with a distance of expansion or less (using metric)
+     * are included, unless the expansion would take a cell further than 0 or out of the appropriate dimension in
+     * bounds, in which case that cell is stopped at the edge.
      * Returns a new packed bitmap and does not modify packed.
      * @param packed a packed bitmap returned by pack() or a similar method
-     * @param expansion the positive (square or diamond) radius, in cells, to expand each cell out by; clamped at 100 if
-     *                  chebyshev is false
+     * @param expansion the positive (square, diamond, or circular) radius, in cells, to expand each cell out by
      * @param bounds the bounds of the positions to expand; bits will stop before they hit the bounds or go negative
-     * @param chebyshev true to use Chebyshev distance and expand equally in diagonal and orthogonal directions; false
-     *                  to use Manhattan distance and only expand in orthogonal directions at each step
+     * @param metric the distance metric to use; a Metric enum from this package
      * @return a packed bitmap that encodes "on" for packed and cells that expanded from cells that were "on" in packed
      */
-    public EWAHCompressedBitmap32 expand(EWAHCompressedBitmap32 packed, int expansion, int[] bounds, boolean chebyshev)
+    public EWAHCompressedBitmap32 expand(EWAHCompressedBitmap32 packed, int expansion, int[] bounds, Metric metric)
     {
         if(packed == null || packed.isEmpty())
         {
             return ALL_WALL;
         }
-        int[][] movers;
-        if(chebyshev) movers = expandChebyshev(expansion);
-        else movers = expandManhattan(expansion);
+        int[][] movers = expandMetric(metric, expansion);
         IntSortedSet ints = new IntRBTreeSet();
         IntIterator it = packed.intIterator();
         int[] pt = new int[bounds.length];
@@ -648,32 +710,30 @@ public class RegionPacker {
 
         return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
     }
+
     /**
      * Finds the area around the cells encoded in packed, without including those cells. Searches the area around each
-     * "on" position in packed to cover either a square/cube/hypercube or a diamond/octahedron/cross polytope (for 2D,
-     * 3D, and higher dimensions, respectively) depending on whether the chebyshev argument is true (producing a
-     * hypercube) or false (producing a cross polytope). The cells with a Chebyshev or Manhattan distance (the former if
-     * chebyshev is true) of expansion or less are included, unless the expansion would take a cell further than 0 or
-     * out of the appropriate dimension in bounds, in which case that cell is stopped at the edge, or a cell would
-     * overlap with the cells in packed, in which case it is not included at all.
+     * "on" position in packed to cover an n-dimensional region, one of square/cube/hypercube,
+     * diamond/octahedron/cross polytope, or circle/sphere/hypersphere (for 2D/3D/higher dimensions) depending on the
+     * metric parameter (CHEBYSHEV produces a square, MANHATTAN produces a diamond, while EUCLIDEAN and EUCLIDEAN_STRICT
+     * produce circles in 2D). The center of each cell and the cells with a distance of expansion or less (using metric)
+     * are included, unless the expansion would take a cell further than 0 or out of the appropriate dimension in
+     * bounds, in which case that cell is stopped at the edge, or a cell would overlap with the cells in packed, in
+     * which case it is not included at all.
      * Returns a new packed bitmap and does not modify packed.
      * @param packed a packed bitmap returned by pack() or a similar method
-     * @param expansion the positive (square or diamond) radius, in cells, to push each cell out by; clamped at 100 if
-     *                  chebyshev is false
+     * @param expansion the positive (square, diamond, or circular) radius, in cells, to push each cell out by
      * @param bounds the bounds of the positions to expand; bits will stop before they hit the bounds or go negative
-     * @param chebyshev true to use Chebyshev distance and expand equally in diagonal and orthogonal directions; false
-     *                  to use Manhattan distance and only expand in orthogonal directions at each step
+     * @param metric the distance metric to use; a Metric enum from this package
      * @return a packed bitmap that encodes "on" for cells that were pushed from the edge of packed's "on" cells
      */
-    public EWAHCompressedBitmap32 fringe(EWAHCompressedBitmap32 packed, int expansion, int[] bounds, boolean chebyshev)
+    public EWAHCompressedBitmap32 fringe(EWAHCompressedBitmap32 packed, int expansion, int[] bounds, Metric metric)
     {
         if(packed == null || packed.isEmpty())
         {
             return ALL_WALL;
         }
-        int[][] movers;
-        if(chebyshev) movers = expandChebyshev(expansion);
-        else movers = expandManhattan(expansion);
+        int[][] movers = expandMetric(metric, expansion);
 
         IntSet checks = new IntOpenHashSet(packed.toArray());
         IntSortedSet ints = new IntRBTreeSet();
@@ -734,29 +794,28 @@ public class RegionPacker {
 
         return values;
     }
+
     /**
      * Finds the concentric areas around the cells encoded in packed, without including those cells. Searches the area
-     * around each "on" position in packed to cover either a square/cube/hypercube or a diamond/octahedron/cross
-     * polytope (for 2D, 3D, and higher dimensions, respectively) depending on whether the chebyshev argument is true
-     * (producing a hypercube) or false (producing a cross polytope). The distance measurement is Chebyshev or Manhattan
-     * distance, the former if chebyshev is true. Cells with a distance of 1 are included in the first element of the
-     * returned array of packed bitmaps, cells with a distance of 2 are included in the second element of that array
-     * (and not cells at any other distance), and so on up to a distance equal to expansion. If a cell in a packed
-     * bitmap would overlap with the cells in packed or has already been included in an earlier packed bitmap in the
-     * returned array, it is not added to a packed bitmap. If the expansion would take a cell further than 0 or out of
-     * the appropriate dimension in bounds, that cell is technically stopped at the edge, but in all cases it will have
-     * been included in an earlier fringe or in packed itself, so those cells won't be included anyway.
-     * Returns an array of new packed bitmaps and does not modify packed.
+     * around each "on" position in packed to cover an n-dimensional region, one of square/cube/hypercube,
+     * diamond/octahedron/cross polytope, or circle/sphere/hypersphere (for 2D/3D/higher dimensions) depending on the
+     * metric parameter (CHEBYSHEV produces a square, MANHATTAN produces a diamond, while EUCLIDEAN and EUCLIDEAN_STRICT
+     * produce circles in 2D). The distance measurement is based on metric. Cells with a distance of 1 are included in
+     * the first element of the returned array of packed bitmaps, cells with a distance of 2 are included in the second
+     * element of that array (and not cells at any other distance), and so on up to a distance equal to expansion. If a
+     * cell in a packed bitmap would overlap with the cells in packed or has already been included in an earlier packed
+     * bitmap in the returned array, it is not added to a packed bitmap. If the expansion would take a cell further than
+     * 0 or out of the appropriate dimension in bounds, that cell is technically stopped at the edge, but in all cases
+     * it will have been included in an earlier fringe or in packed itself, so those cells won't be included anyway.
+     * Returns a new packed bitmap and does not modify packed.
      * @param packed a packed bitmap returned by pack() or a similar method
-     * @param expansion the positive (square or diamond) radius, in cells, to push the furthest cell out by; clamped at 100
-     *                  if chebyshev is false
+     * @param expansion the positive (square, diamond, or circular) radius, in cells, to push the furthest cell out by
      * @param bounds the bounds of the positions to expand; bits will stop before they hit the bounds or go negative
-     * @param chebyshev true to use Chebyshev distance and expand equally in diagonal and orthogonal directions; false
-     *                  to use Manhattan distance and only expand in orthogonal directions at each step
+     * @param metric the distance metric to use; a Metric enum from this package
      * @return an array of packed bitmaps, with length equal to expansion, where each bitmap encodes "on" for cells that
-     * have a Manhattan or Chebyshev distance to the nearest "on" cell in packed equal to the index in the array plus 1.
+     * have a distance to the nearest "on" cell in packed equal to the index in the array plus 1.
      */
-    public EWAHCompressedBitmap32[] fringes(EWAHCompressedBitmap32 packed, int expansion, int[] bounds, boolean chebyshev)
+    public EWAHCompressedBitmap32[] fringes(EWAHCompressedBitmap32 packed, int expansion, int[] bounds, Metric metric)
     {
         EWAHCompressedBitmap32[] values = new EWAHCompressedBitmap32[expansion];
         if(packed == null || packed.isEmpty())
@@ -768,8 +827,7 @@ public class RegionPacker {
         IntSortedSet ints;
         int[][] movers;
         for (int i = 1; i <= expansion; i++) {
-            if(chebyshev) movers = expandChebyshev(i);
-            else movers = expandManhattan(i);
+            movers = expandMetric(metric, i);
             ints = new IntRBTreeSet();
             IntIterator it = packed.intIterator();
             int[] pt = new int[bounds.length];
@@ -788,22 +846,21 @@ public class RegionPacker {
 
     /**
      * Given the packed data start and container, where start encodes some area to expand out from and container encodes
-     * the (typically irregularly shaped) region of viable positions that can be filled, a bounds array storing maximum
-     * height/width/etc. and an amount to expand outward by, expands each cell in start by a Manhattan (diamond) radius
-     * equal to expansion, limiting any expansion to within container and bounds and returning the final expanded
-     * (limited) packed data. Because this goes in 1-distance steps of expansion, and this won't expand into any areas
-     * not present in container, any gaps in container will take more steps to move around than a normal expansion would
-     * moving through. This can be useful for a number of effects where contiguous movement needs to be modeled.
+     * the (typically irregularly shaped) region of viable positions that can be filled, and an amount to expand outward
+     * by, expands each cell in start by a Manhattan (diamond) radius equal to expansion, limiting any expansion to
+     * within container and returning the final expanded (limited) packed data. Because this goes in 1-distance steps of
+     * expansion, and this won't expand into any areas not present in container, any gaps in container will take more
+     * steps to move around than a normal expansion would moving through. This can be useful for a number of effects
+     * where contiguous movement needs to be modeled.
      * Returns a new packed bitmap and does not modify start or container.
      * @param start a packed bitmap returned by pack() or a similar method that stores the start points of the flood
      * @param container a packed bitmap that represents all viable cells that this is allowed to flood into
-     * @param expansion the positive (diamond) radius, in cells, to push the furthest cells out by; clamped at 100
-     * @param bounds the bounds of the positions to expand; bits will stop before they hit the bounds or go negative
+     * @param expansion the positive (diamond) radius, in cells, to flood out by
      * @return a packed bitmap that does not extend beyond container and encodes the stepwise flood out from start by
      * a number of steps equal to expansion.
      */
     public EWAHCompressedBitmap32 flood(EWAHCompressedBitmap32 start, EWAHCompressedBitmap32 container,
-                                        int expansion, int[] bounds)
+                                        int expansion)
     {
         if(start == null || start.isEmpty() || container == null || container.isEmpty())
         {
@@ -816,9 +873,9 @@ public class RegionPacker {
 
         for (int i = 1; i <= expansion; i++) {
             IntegerIterator it = start2.iterator();
-            int[] pt = new int[bounds.length];
+            int[] pt = new int[curve.dimensionality.length];
             while (it.hasNext()) {
-                assignFlood(ints, checks, edge, surround, curve.alter(pt, it.nextInt()), bounds, movers);
+                assignFlood(ints, checks, edge, surround, curve.alter(pt, it.nextInt()), movers);
             }
 
             if(edge.isEmpty())
@@ -834,26 +891,24 @@ public class RegionPacker {
 
     /**
      * Given the packed data start and container, where start encodes some area to expand out from and container encodes
-     * the (typically irregularly shaped) region of viable positions that can be filled, a bounds array storing maximum
-     * height/width/etc. an amount to expand outward by, and a distance metric (Chebyshev or Manhattan distance, the
-     * former if chebyshev is true.), expands each cell in start by a radius using the specified distance metric equal
-     * to expansion, limiting any expansion to within container and bounds and returning the final expanded (limited)
-     * packed data. Because this goes in 1-distance steps of expansion, and this won't expand into any areas not present
-     * in container, any gaps in container will take more steps to move around than a normal expansion would moving
-     * through. This can be useful for a number of effects where contiguous movement needs to be modeled.
+     * the (typically irregularly shaped) region of viable positions that can be filled, an amount to expand outward by,
+     * and a distance metric (Chebyshev, Manhattan, or Euclidean distance, in a Metric enum), expands each cell in start
+     * by a radius using the specified distance metric equal to expansion, limiting any expansion to within container
+     * and returning the final expanded (limited) packed data. Because this goes in 1-distance steps of expansion, and
+     * this won't expand into any areas not present in container, any gaps in container will take more steps to move
+     * around than a normal expansion would moving through. This can be useful for a number of effects where contiguous
+     * movement needs to be modeled. Also, the EUCLIDEAN, EUCLIDEAN_STRICT, and CHEBYSHEV Metric values will all be
+     * equivalent here because of the 1-step rule.
      * Returns a new packed bitmap and does not modify start or container.
      * @param start a packed bitmap returned by pack() or a similar method that stores the start points of the flood
      * @param container a packed bitmap that represents all viable cells that this is allowed to flood into
-     * @param expansion the positive (square or diamond) radius, in cells, to push the furthest cells out by; clamped at
-     *                  100 if chebyshev is false
-     * @param bounds the bounds of the positions to expand; bits will stop before they hit the bounds or go negative
-     * @param chebyshev true to use Chebyshev distance and expand equally in diagonal and orthogonal directions; false
-     *                  to use Manhattan distance and only expand in orthogonal directions at each step
+     * @param expansion the positive (square, diamond or circular) radius, in cells, to flood out by
+     * @param metric the distance metric to use; a Metric enum from this package
      * @return a packed bitmap that does not extend beyond container and encodes the stepwise flood out from start by
      * a number of steps equal to expansion.
      */
     public EWAHCompressedBitmap32 flood(EWAHCompressedBitmap32 start, EWAHCompressedBitmap32 container,
-                                        int expansion, int[] bounds, boolean chebyshev)
+                                        int expansion, Metric metric)
     {
         if(start == null || start.isEmpty() || container == null || container.isEmpty())
         {
@@ -862,15 +917,13 @@ public class RegionPacker {
         IntSet checks = new IntOpenHashSet(), edge = new IntOpenHashSet(), start2 = new IntOpenHashSet(start.toArray()),
                 surround = new IntOpenHashSet(container.toArray());
         IntSortedSet ints = new IntRBTreeSet();
-        int[][] movers;
-        if(chebyshev) movers = expandChebyshev(1);
-        else movers = expandManhattan(1);
+        int[][] movers = expandMetric(metric, 1);
 
         for (int i = 1; i <= expansion; i++) {
             IntegerIterator it = start2.iterator();
-            int[] pt = new int[bounds.length];
+            int[] pt = new int[curve.dimensionality.length];
             while (it.hasNext()) {
-                assignFlood(ints, checks, edge, surround, curve.alter(pt, it.nextInt()), bounds, movers);
+                assignFlood(ints, checks, edge, surround, curve.alter(pt, it.nextInt()), movers);
             }
 
             if(edge.isEmpty())
@@ -882,6 +935,89 @@ public class RegionPacker {
         }
 
         return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
+    }
+
+    /**
+     * Finds the area made by removing the "on" positions in packed that are within the specified retraction distance of
+     * an "off" position or the edge of the data, as reported by bounds. This essentially finds a shrunken version of
+     * packed. Uses Manhattan distance.
+     * Returns a new packed bitmap and does not modify packed.
+     * @param packed a packed bitmap returned by pack() or a similar method
+     * @param retraction the positive (diamond) radius, in cells, to pull each cell in by
+     * @param bounds the bounds of the positions in packed
+     * @return a packed bitmap that encodes "on" for cells that were "on" in packed and were far from an "off" cell
+     */
+    public EWAHCompressedBitmap32 retract(EWAHCompressedBitmap32 packed, int retraction, int[] bounds)
+    {
+        return difference(packed, expand(negate(packed), retraction, bounds));
+    }
+    /**
+     * Finds the area made by removing the "on" positions in packed that are within the specified retraction distance of
+     * an "off" position or the edge of the data, as reported by bounds. This essentially finds a shrunken version of
+     * packed. Uses metric to measure distance.
+     * Returns a new packed bitmap and does not modify packed.
+     * @param packed a packed bitmap returned by pack() or a similar method
+     * @param retraction the positive (square, diamond, or circular) radius, in cells, to pull each cell in by
+     * @param bounds the bounds of the positions in packed
+     * @param metric the distance metric to use; a Metric enum from this package
+     * @return a packed bitmap that encodes "on" for cells that were "on" in packed and were far from an "off" cell
+     */
+    public EWAHCompressedBitmap32 retract(EWAHCompressedBitmap32 packed, int retraction, int[] bounds, Metric metric)
+    {
+        return difference(packed, expand(negate(packed), retraction, bounds, metric));
+    }
+
+    /**
+     * Finds the area consisting of the "on" positions in packed that are within the specified depth distance of an
+     * "off" position or the edge of the data, as reported by bounds. This essentially finds the part of packed that is
+     * close to its edge. Uses Manhattan distance.
+     * Returns a new packed bitmap and does not modify packed.
+     * @param packed a packed bitmap returned by pack() or a similar method
+     * @param depth the positive (diamond) radius, in cells, to go inward from an "off" cell into the "on" cells
+     * @param bounds the bounds of the positions in packed
+     * @return a packed bitmap that encodes "on" for cells that were "on" in packed and were close to an "off" cell
+     */
+    public EWAHCompressedBitmap32 surface(EWAHCompressedBitmap32 packed, int depth, int[] bounds)
+    {
+        return intersect(packed, expand(negate(packed), depth, bounds));
+    }
+    /**
+     * Finds the area consisting of the "on" positions in packed that are within the specified depth distance of an
+     * "off" position or the edge of the data, as reported by bounds. This essentially finds the part of packed that is
+     * close to its edge. Uses metric to measure distance.
+     * Returns a new packed bitmap and does not modify packed.
+     * @param packed a packed bitmap returned by pack() or a similar method
+     * @param depth the positive (square, diamond, or circular) radius, in cells, to go inward from an "off" cell into
+     *              the "on" cells
+     * @param bounds the bounds of the positions in packed
+     * @param metric the distance metric to use; a Metric enum from this package
+     * @return a packed bitmap that encodes "on" for cells that were "on" in packed and were close to an "off" cell
+     */
+    public EWAHCompressedBitmap32 surface(EWAHCompressedBitmap32 packed, int depth, int[] bounds, Metric metric)
+    {
+        return intersect(packed, expand(negate(packed), depth, bounds, metric));
+    }
+
+
+    /**
+     * Given a packed bitmap that encodes multiple unconnected "on" areas, this finds each isolated area and returns
+     * it as an element in a List of packed bitmaps, with one bitmap per isolated area.
+     *
+     * @param packed a packed bitmap that probably encodes multiple unconnected "on" areas
+     * @return an ArrayList of packed bitmaps containing each unconnected area from packed as a bitmap element
+     */
+    public List<EWAHCompressedBitmap32> split(EWAHCompressedBitmap32 packed)
+    {
+        ArrayList<EWAHCompressedBitmap32> parts = new ArrayList<EWAHCompressedBitmap32>(32);
+
+        EWAHCompressedBitmap32 remaining = copy(packed), area;
+
+        while (!remaining.isEmpty()) {
+            area = flood(packOneCurve(remaining.getFirstSetBit()), packed, curve.maxDistance);
+            parts.add(area);
+            remaining = difference(remaining, area);
+        }
+        return parts;
     }
 
     /**
