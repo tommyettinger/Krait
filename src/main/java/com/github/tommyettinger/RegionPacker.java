@@ -122,7 +122,7 @@ import java.util.List;
  */
 public class RegionPacker {
 
-    public final EWAHCompressedBitmap32 ALL_WALL,
+    public final EWAHCompressedBitmap32 ALL_OFF,
             ALL_ON;
     private static final int[] manhattan_100 = new int[]
             {
@@ -143,7 +143,7 @@ public class RegionPacker {
     public RegionPacker(CurveStrategy curveStrategy)
     {
         curve = curveStrategy;
-        ALL_WALL = new EWAHCompressedBitmap32(1);
+        ALL_OFF = new EWAHCompressedBitmap32(1);
         ALL_ON = new EWAHCompressedBitmap32();
         ALL_ON.not();
     }
@@ -236,7 +236,7 @@ public class RegionPacker {
             }
         }
         if(packing.isEmpty())
-            return ALL_WALL;
+            return ALL_OFF;
         return packing;
     }
 
@@ -492,6 +492,17 @@ public class RegionPacker {
         return curve.distance(pt2);
     }
 
+    private int edgyDistanceTranslate(int[] pt, int[] bounds, int[] movement, int multiplier)
+    {
+        int[] pt2 = new int[pt.length];
+        for (int i = 0; i < pt.length; i++) {
+            pt2[i] = pt[i] + movement[i] * multiplier;
+            if(pt2[i] < 0 || pt2[i] >= bounds[i])
+                return -1;
+        }
+        return curve.distance(pt2);
+    }
+
     private void assignExpand(IntSortedSet values, int[] pt, int[] bounds, int[][] movers)
     {
         for (int i = 0; i < movers.length; i++) {
@@ -505,6 +516,19 @@ public class RegionPacker {
         for (int i = 0; i < movers.length; i++) {
             temp = clampedDistanceTranslate(pt, bounds, movers[i]);
             if (checks.add(temp)) {
+                values.add(temp);
+            }
+        }
+    }
+    private void assignOpposed(IntSortedSet values, IntSet checks, int[] pt, int[] bounds, int[][] movers)
+    {
+        int temp, beyond;
+        for (int i = 0; i < movers.length; i++) {
+            temp = edgyDistanceTranslate(pt, bounds, movers[i], 1);
+            if(temp < 0 || checks.contains(temp))
+                continue;
+            beyond = edgyDistanceTranslate(pt, bounds, movers[i], 2);
+            if (beyond < 0 || checks.contains(beyond)) {
                 values.add(temp);
             }
         }
@@ -597,7 +621,7 @@ public class RegionPacker {
     {
         if(packed == null || packed.isEmpty())
         {
-            return ALL_WALL;
+            return ALL_OFF;
         }
         IntSortedSet ints = new IntRBTreeSet();
         IntIterator it = packed.intIterator();
@@ -606,7 +630,7 @@ public class RegionPacker {
             ints.add(clampedDistanceTranslateInPlace(curve.alter(pt, it.next()), bounds, movement));
         }
         if(ints.size() < 1)
-            return ALL_WALL;
+            return ALL_OFF;
 
         return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
     }
@@ -626,7 +650,7 @@ public class RegionPacker {
     {
         if(packed == null || packed.isEmpty())
         {
-            return ALL_WALL;
+            return ALL_OFF;
         }
         int[][] movers = expandManhattan(expansion);
         IntSortedSet ints = new IntRBTreeSet();
@@ -637,7 +661,7 @@ public class RegionPacker {
         }
 
         if(ints.isEmpty())
-            return ALL_WALL;
+            return ALL_OFF;
 
         return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
     }
@@ -661,7 +685,7 @@ public class RegionPacker {
     {
         if(packed == null || packed.isEmpty())
         {
-            return ALL_WALL;
+            return ALL_OFF;
         }
         int[][] movers = expandMetric(metric, expansion);
         IntSortedSet ints = new IntRBTreeSet();
@@ -672,7 +696,7 @@ public class RegionPacker {
         }
 
         if(ints.isEmpty())
-            return ALL_WALL;
+            return ALL_OFF;
 
         return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
     }
@@ -694,7 +718,7 @@ public class RegionPacker {
     {
         if(packed == null || packed.isEmpty())
         {
-            return ALL_WALL;
+            return ALL_OFF;
         }
         int[][] movers = expandManhattan(expansion);
         IntSet checks = new IntOpenHashSet(packed.toArray());
@@ -706,7 +730,7 @@ public class RegionPacker {
         }
 
         if(ints.isEmpty())
-            return ALL_WALL;
+            return ALL_OFF;
 
         return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
     }
@@ -731,7 +755,7 @@ public class RegionPacker {
     {
         if(packed == null || packed.isEmpty())
         {
-            return ALL_WALL;
+            return ALL_OFF;
         }
         int[][] movers = expandMetric(metric, expansion);
 
@@ -744,11 +768,10 @@ public class RegionPacker {
         }
 
         if(ints.isEmpty())
-            return ALL_WALL;
+            return ALL_OFF;
 
         return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
     }
-
 
     /**
      * Finds the concentric areas around the cells encoded in packed, without including those cells. Searches the area
@@ -772,7 +795,7 @@ public class RegionPacker {
         EWAHCompressedBitmap32[] values = new EWAHCompressedBitmap32[expansion];
         if(packed == null || packed.isEmpty())
         {
-            Arrays.fill(values, ALL_WALL);
+            Arrays.fill(values, ALL_OFF);
             return values;
         }
         IntSet checks = new IntOpenHashSet(packed.toArray());
@@ -787,7 +810,7 @@ public class RegionPacker {
             }
 
             if(ints.isEmpty())
-                values[i - 1] = ALL_WALL;
+                values[i - 1] = ALL_OFF;
             else
                 values[i - 1] = EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
         }
@@ -820,7 +843,7 @@ public class RegionPacker {
         EWAHCompressedBitmap32[] values = new EWAHCompressedBitmap32[expansion];
         if(packed == null || packed.isEmpty())
         {
-            Arrays.fill(values, ALL_WALL);
+            Arrays.fill(values, ALL_OFF);
             return values;
         }
         IntSet checks = new IntOpenHashSet(packed.toArray());
@@ -836,13 +859,81 @@ public class RegionPacker {
             }
 
             if(ints.isEmpty())
-                values[i - 1] = ALL_WALL;
+                values[i - 1] = ALL_OFF;
             else
                 values[i - 1] = EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
         }
 
         return values;
     }
+
+    /**
+     * Finds the area that has a cell encoded in packed on two opposing sides, without including the cells in packed.
+     * Searches the area around each "on" position in packed to cover a diamond in 2D, octahedron in 3D, or cross
+     * polytope in higher dimensions, with the cells that are not in packed but have Manhattan distance 1 from two "on"
+     * positions along the same line included. Cells outside of bounds count as "on" for this purpose.
+     * Returns a new packed bitmap and does not modify packed.
+     * @param packed a packed bitmap returned by pack() or a similar method
+     * @param bounds the bounds of the positions to expand; out-of-bounds cells count as "on" here
+     * @return a packed bitmap that encodes "on" for cells that are the single-width "filling" between two cells along
+     * one line in packed.
+     */
+    public EWAHCompressedBitmap32 filling(EWAHCompressedBitmap32 packed, int[] bounds)
+    {
+        if(packed == null || packed.isEmpty())
+        {
+            return ALL_OFF;
+        }
+        int[][] movers = expandManhattan(1);
+        IntSet checks = new IntOpenHashSet(packed.toArray());
+        IntSortedSet ints = new IntRBTreeSet();
+        IntIterator it = packed.intIterator();
+        int[] pt = new int[bounds.length];
+        while (it.hasNext()) {
+            assignOpposed(ints, checks, curve.alter(pt, it.next()), bounds, movers);
+        }
+
+        if(ints.isEmpty())
+            return ALL_OFF;
+
+        return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
+    }
+
+    /**
+     * Finds the area that has a cell encoded in packed on two opposing sides, without including the cells in packed.
+     * Searches the area around each "on" position in packed to cover an n-dimensional region based on metric, either
+     * diamond/octahedron/cross polytope for MANHATTAN or square/cube/hypercube for any other (for 2D/3D/higher
+     * dimensions). The cells that are not in packed but have a distance of 1 using the given metric from two "on"
+     * positions along the same line are all that is included in the result. Cells outside of bounds count as "on" for
+     * this purpose.
+     * Returns a new packed bitmap and does not modify packed.
+     * @param packed a packed bitmap returned by pack() or a similar method
+     * @param bounds the bounds of the positions to expand; out-of-bounds cells count as "on" here
+     * @param metric the distance metric to use; a Metric enum from this package
+     * @return a packed bitmap that encodes "on" for cells that were pushed from the edge of packed's "on" cells
+     */
+    public EWAHCompressedBitmap32 filling(EWAHCompressedBitmap32 packed, int[] bounds, Metric metric)
+    {
+        if(packed == null || packed.isEmpty())
+        {
+            return ALL_OFF;
+        }
+        int[][] movers = expandMetric(metric, 1);
+
+        IntSet checks = new IntOpenHashSet(packed.toArray());
+        IntSortedSet ints = new IntRBTreeSet();
+        IntIterator it = packed.intIterator();
+        int[] pt = new int[bounds.length];
+        while (it.hasNext()) {
+            assignOpposed(ints, checks, curve.alter(pt, it.next()), bounds, movers);
+        }
+
+        if(ints.isEmpty())
+            return ALL_OFF;
+
+        return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
+    }
+
 
     /**
      * Given the packed data start and container, where start encodes some area to expand out from and container encodes
@@ -864,7 +955,7 @@ public class RegionPacker {
     {
         if(start == null || start.isEmpty() || container == null || container.isEmpty())
         {
-            return ALL_WALL;
+            return ALL_OFF;
         }
         IntSet checks = new IntOpenHashSet(), edge = new IntOpenHashSet(), start2 = new IntOpenHashSet(start.toArray()),
                 surround = new IntOpenHashSet(container.toArray());
@@ -912,7 +1003,7 @@ public class RegionPacker {
     {
         if(start == null || start.isEmpty() || container == null || container.isEmpty())
         {
-            return ALL_WALL;
+            return ALL_OFF;
         }
         IntSet checks = new IntOpenHashSet(), edge = new IntOpenHashSet(), start2 = new IntOpenHashSet(start.toArray()),
                 surround = new IntOpenHashSet(container.toArray());
@@ -1059,7 +1150,7 @@ public class RegionPacker {
         for (int i = 0; i < bounds.length; i++) {
             int l = bounds[i] - start[i];
             if(l < 1)
-                return ALL_WALL;
+                return ALL_OFF;
             sides[i] = l;
         }
 

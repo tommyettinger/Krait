@@ -73,8 +73,10 @@ public abstract class CurveStrategy {
     /**
      * Given an array or vararg of coordinates, which must have the same length as dimensionality, finds the distance
      * to travel along the space-filling curve to reach that distance.
+     *
      * @param coordinates an array or vararg of int coordinates; must match the length of dimensionality
-     * @return the distance to travel along the space-filling curve to reach the given coordinates, as an int
+     * @return the distance to travel along the space-filling curve to reach the given coordinates, as a int, or -1 if
+     * coordinates are invalid
      */
     public abstract int distance(int... coordinates);
 }
