@@ -533,6 +533,27 @@ public class RegionPacker {
             }
         }
     }
+    private void assignOpposed(IntSortedSet values, IntSet checks, int[] pt, int[] bounds, int[][] movers,
+                               IntSet temporary, int depth)
+    {
+        int beyond, tempPos;
+        CELL_WISE:
+        for (int i = 0; i < movers.length; i++) {
+            temporary.clear();
+            for (int j = 1; j <= depth; j++) {
+                tempPos = edgyDistanceTranslate(pt, bounds, movers[i], j);
+                if(tempPos < 0 || checks.contains(tempPos)) {
+                    temporary.clear();
+                    continue CELL_WISE;
+                }
+                temporary.add(tempPos);
+            }
+            beyond = edgyDistanceTranslate(pt, bounds, movers[i], depth + 1);
+            if (beyond < 0 || checks.contains(beyond)) {
+                values.addAll(temporary);
+            }
+        }
+    }
 
     private void assignFlood(IntSortedSet values, IntSet checks, IntSet edge, IntSet needs, int[] pt, int[][] movers)
     {
@@ -900,12 +921,45 @@ public class RegionPacker {
     }
 
     /**
+     * Finds the area that has a span of cells exactly depth in length encoded in packed on two opposing sides, without
+     * including the cells in packed. Searches the area around each "on" position in packed to cover a diamond in 2D,
+     * octahedron in 3D, or cross polytope in higher dimensions, with the cells that are not in packed but are between
+     * two "on" positions along the same orthogonal line included. Cells outside of bounds count as "on" for this
+     * purpose. Returns a new packed bitmap and does not modify packed.
+     * @param packed a packed bitmap returned by pack() or a similar method
+     * @param bounds the bounds of the positions to expand; out-of-bounds cells count as "on" here
+     * @param depth the distance that must be met exactly between "on" cells for this to count a cell as "filling"
+     * @return a packed bitmap that encodes "on" for cells that are the single-width "filling" between two cells along
+     * one line in packed.
+     */
+    public EWAHCompressedBitmap32 filling(EWAHCompressedBitmap32 packed, int[] bounds, int depth)
+    {
+        if(packed == null || packed.isEmpty())
+        {
+            return ALL_OFF;
+        }
+        int[][] movers = expandManhattan(1);
+        IntSet checks = new IntOpenHashSet(packed.toArray()), group = new IntOpenHashSet(depth);
+        IntSortedSet ints = new IntRBTreeSet();
+        IntIterator it = packed.intIterator();
+        int[] pt = new int[bounds.length];
+        while (it.hasNext()) {
+            assignOpposed(ints, checks, curve.alter(pt, it.next()), bounds, movers, group, depth);
+        }
+
+        if(ints.isEmpty())
+            return ALL_OFF;
+
+        return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
+    }
+
+    /**
      * Finds the area that has a cell encoded in packed on two opposing sides, without including the cells in packed.
      * Searches the area around each "on" position in packed to cover an n-dimensional region based on metric, either
      * diamond/octahedron/cross polytope for MANHATTAN or square/cube/hypercube for any other (for 2D/3D/higher
-     * dimensions). The cells that are not in packed but have a distance of 1 using the given metric from two "on"
-     * positions along the same line are all that is included in the result. Cells outside of bounds count as "on" for
-     * this purpose.
+     * dimensions). The cells that are not in packed but are between two "on" positions along the same orthogonal (for
+     * Manhattan) or any (for other Metric values) line are all that is included in the result. Cells outside of bounds
+     * count as "on" for this purpose.
      * Returns a new packed bitmap and does not modify packed.
      * @param packed a packed bitmap returned by pack() or a similar method
      * @param bounds the bounds of the positions to expand; out-of-bounds cells count as "on" here
@@ -926,6 +980,42 @@ public class RegionPacker {
         int[] pt = new int[bounds.length];
         while (it.hasNext()) {
             assignOpposed(ints, checks, curve.alter(pt, it.next()), bounds, movers);
+        }
+
+        if(ints.isEmpty())
+            return ALL_OFF;
+
+        return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
+    }
+
+    /**
+     * Finds the area that has a span of cells exactly depth in length encoded in packed on two opposing sides, without
+     * including the cells in packed. Searches the area around each "on" position in packed to cover an n-dimensional
+     * region based on metric, either diamond/octahedron/cross polytope for MANHATTAN or square/cube/hypercube for any
+     * other (for 2D/3D/higher dimensions). The cells that are not in packed but have a distance of 1 using the given metric from two "on"
+     * positions along the same line are all that is included in the result. Cells outside of bounds count as "on" for
+     * this purpose.
+     * Returns a new packed bitmap and does not modify packed.
+     * @param packed a packed bitmap returned by pack() or a similar method
+     * @param bounds the bounds of the positions to expand; out-of-bounds cells count as "on" here
+     * @param depth the distance that must be met exactly between "on" cells for this to count a cell as "filling"
+     * @param metric the distance metric to use; a Metric enum from this package
+     * @return a packed bitmap that encodes "on" for cells that were pushed from the edge of packed's "on" cells
+     */
+    public EWAHCompressedBitmap32 filling(EWAHCompressedBitmap32 packed, int[] bounds, int depth, Metric metric)
+    {
+        if(packed == null || packed.isEmpty())
+        {
+            return ALL_OFF;
+        }
+        int[][] movers = expandMetric(metric, 1);
+
+        IntSet checks = new IntOpenHashSet(packed.toArray()), group = new IntOpenHashSet(depth);
+        IntSortedSet ints = new IntRBTreeSet();
+        IntIterator it = packed.intIterator();
+        int[] pt = new int[bounds.length];
+        while (it.hasNext()) {
+            assignOpposed(ints, checks, curve.alter(pt, it.next()), bounds, movers, group, depth);
         }
 
         if(ints.isEmpty())

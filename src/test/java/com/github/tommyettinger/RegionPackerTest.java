@@ -13,7 +13,8 @@ import static org.junit.Assert.assertEquals;
 public class RegionPackerTest {
 
     public static PukaHilbert1280Strategy ph1280 = new PukaHilbert1280Strategy();
-    public static RegionPacker rp = new RegionPacker(), rp3 = new RegionPacker(ph1280);
+    public static Hilbert2DStrategy hilbert = new Hilbert2DStrategy(256);
+    public static RegionPacker rp = new RegionPacker(hilbert), rp3 = new RegionPacker(ph1280);
     public static EWAHCompressedBitmap32 dataCross = rp.union(
             rp.rectangle(new int[]{25, 2}, new int[] {14 + 25, 60 + 2}), rp.rectangle(new int[] {2, 25}, new int[] {60 + 2, 14 + 25}));
     public static int[] crossBounds = new int[]{64, 64};
@@ -43,6 +44,39 @@ public class RegionPackerTest {
     public void printBits32(int n) {
         for (int i = 1 << 31; i != 0; i >>>= 1)
             System.out.print((n & i) != 0 ? 1 : 0);
+    }
+    public static void print2D(EWAHCompressedBitmap32 area)
+    {
+        for (int y = 0; y < 64; y++) {
+            for (int x = 0; x < 64; x++) {
+                System.out.print(area.get(hilbert.distance(x, y)) ? '.' : '#');
+            }
+            System.out.println();
+        }
+    }
+    public static void printOverlay(EWAHCompressedBitmap32 area1, EWAHCompressedBitmap32 area2)
+    {
+        for (int y = 0; y < 64; y++) {
+            for (int x = 0; x < 64; x++) {
+                int which = area1.get(hilbert.distance(x, y)) ? 1 : 0;
+                which |= area2.get(hilbert.distance(x, y)) ? 2 : 0;
+                switch (which)
+                {
+                    case 1:
+                        System.out.print('.');
+                        break;
+                    case 2:
+                        System.out.print('2');
+                        break;
+                    case 3:
+                        System.out.print('!');
+                        break;
+                    default:
+                        System.out.print('#');
+                }
+            }
+            System.out.println();
+        }
     }
 
     public long arrayMemoryUsage(int length, long bytesPerItem)
@@ -152,6 +186,21 @@ public class RegionPackerTest {
                 point(26, 4));
         //printPacked(flooded, 64, 64);
         assertEquals(flooded, manual);
+    }
+
+    @Test
+    public void testFilling() {
+        //EWAHCompressedBitmap32 dc2 = rp.retract(dataCross, 1, crossBounds, Metric.CHEBYSHEV);
+        //print2D(dc2);
+        //System.out.println();
+
+        EWAHCompressedBitmap32 corners = rp.filling(dataCross, crossBounds, Metric.CHEBYSHEV);
+        print2D(corners);
+        System.out.println();
+        corners = rp.filling(dataCross, crossBounds, 2, Metric.CHEBYSHEV);
+        print2D(corners);
+        System.out.println();
+        printOverlay(dataCross, corners);
     }
     /*
     @Test
