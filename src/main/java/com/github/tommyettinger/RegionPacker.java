@@ -566,6 +566,31 @@ public class RegionPacker {
             }
         }
     }
+
+    private void computeEdge(IntSet values, IntSet edge, IntSet needs, int[] pt, int[][] movers)
+    {
+        int temp;
+        for (int i = 0; i < movers.length; i++) {
+            temp = clampedDistanceTranslate(pt, curve.dimensionality, movers[i]);
+            if (needs.contains(temp) && !values.contains(temp)) {
+                edge.add(temp);
+            }
+        }
+    }
+
+    private int assignRandomFlood(IntSortedSet values, IntSet checks, IntSet edge, IntSet needs,
+                                   int[][] movers, RNG rng)
+    {
+        int temp = rng.getRandomElement(edge);
+        if (needs.contains(temp) && checks.add(temp)) {
+            values.add(temp);
+            edge.remove(temp);
+            computeEdge(values, edge, needs, curve.point(temp), movers);
+            return 1;
+        }
+        return 0;
+    }
+
     private int[][] expandChebyshev(int expansion)
     {
         int[] move = new int[curve.dimensionality.length];
@@ -1118,6 +1143,51 @@ public class RegionPacker {
         return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
     }
 
+
+    /**
+     * Given the packed data start and container, where start encodes some area to expand out from and container encodes
+     * the (typically irregularly shaped) region of viable positions that can be filled, a volume to try to reach by
+     * expanding start in random orthogonal directions and an rng to determine random numbers, expands a random cell in
+     * start in a random orthogonal direction, repeating until volume is reached or container is filled, and returning
+     * the final expanded (limited) packed data. Any expansion is limited to within container. Because this goes in
+     * 1-distance random steps of expansion, and this won't expand into any areas not present in container, any gaps in
+     * container are likely to take longer to move around than a normal expansion would moving through. This can be
+     * useful for a number of effects where contiguous random movement needs to be modeled, such as basic gas-filling.
+     * Returns a new packed bitmap and does not modify start or container.
+     * @param start a packed bitmap returned by pack() or a similar method that stores the start points of the flood
+     * @param container a packed bitmap that represents all viable cells that this is allowed to flood into
+     * @param volume the total number of positions this should try to flood out to; should be greater than count(start)
+     * @return a packed bitmap that does not extend beyond container and encodes the stepwise flood out from start by
+     * a number of steps equal to expansion.
+     */
+    public EWAHCompressedBitmap32 randomFlood(EWAHCompressedBitmap32 start, EWAHCompressedBitmap32 container,
+                                        int volume, RNG rng)
+    {
+        if(start == null || start.isEmpty() || container == null || container.isEmpty())
+        {
+            return ALL_OFF;
+        }
+        IntSet checks = new IntOpenHashSet(), edge = new IntOpenHashSet(),
+                surround = new IntOpenHashSet(container.toArray());
+        IntSortedSet ints = new IntRBTreeSet(start.toArray());
+        int[][] movers = expandManhattan(1);
+        int[] pt = new int[curve.dimensionality.length];
+
+        IntIterator it = start.intIterator();
+        while(it.hasNext())
+        {
+            computeEdge(ints, edge, surround, curve.alter(pt, it.next()), movers);
+        }
+        int s = ints.size(), danger = 0;
+        while (s < volume && danger++ < volume * 20) {
+            s += assignRandomFlood(ints, checks, edge, surround, movers, rng);
+
+            if(edge.isEmpty())
+                break;
+        }
+
+        return EWAHCompressedBitmap32.bitmapOf(ints.toIntArray());
+    }
     /**
      * Finds the area made by removing the "on" positions in packed that are within the specified retraction distance of
      * an "off" position or the edge of the data, as reported by bounds. This essentially finds a shrunken version of

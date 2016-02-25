@@ -189,6 +189,16 @@ public class RegionPackerTest {
     }
 
     @Test
+    public void testRandomFlood() {
+        RNG rng = new RNG(0x1337BEEFBABEL);
+        EWAHCompressedBitmap32 flooded = rp.randomFlood(rp.packOne(26, 2), dataCross, 20, rng);
+        print2D(flooded);
+        System.out.println();
+        EWAHCompressedBitmap32 flooded2 = rp.randomFlood(flooded, dataCross, 40, rng);
+        printOverlay(flooded, flooded2);
+    }
+
+    @Test
     public void testFilling() {
         //EWAHCompressedBitmap32 dc2 = rp.retract(dataCross, 1, crossBounds, Metric.CHEBYSHEV);
         //print2D(dc2);

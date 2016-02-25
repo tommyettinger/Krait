@@ -9,6 +9,8 @@ See <http://creativecommons.org/publicdomain/zero/1.0/>. */
 package com.github.tommyettinger;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntCollection;
+import it.unimi.dsi.fastutil.ints.IntegerIterator;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -261,6 +263,26 @@ public class RNG extends Random
             return null;
         }
         return list.get(nextInt(list.size()));
+    }
+
+    /**
+     * Returns a random int from the provided IntCollection.
+     *
+     * @param ints a FastUtil IntCollection
+     * @return the randomly selected int
+     */
+    public int getRandomElement(IntCollection ints) {
+        int s = ints.size(), r;
+        if (s < 1) {
+            return -1;
+        }
+        r = nextInt(s);
+
+        IntegerIterator it = ints.iterator();
+        if(r >= 1) {
+            it.skip(r);
+        }
+        return it.next();
     }
     /**
      * Shuffle an array using the "inside-out" Fisher-Yates algorithm.
