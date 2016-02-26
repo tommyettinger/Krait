@@ -213,15 +213,19 @@ public class RegionPacker {
     /**
      * Compresses a boolean array of data encoded so the lowest-index dimensions are the most significant, using the
      * specified bounds to determine the conversion from n-dimensional to 1-dimensional, returning a compressed bitmap
-     * from the JavaEWAH library, EWAHCompressedBitmap32.
+     * from the JavaEWAH library, EWAHCompressedBitmap32, which can be passed to most methods of this class
+     * (RegionPacker). In most cases, if you have data not produced by this library, you will find it easier to use the
+     * overload of pack() that takes a LinearData object. You can construct a LinearData object using a
+     * multi-dimensional boolean array, which may match how you produce your data more closely.
      *
-     * @param data a boolean array that is encodes so .
+     * @param data a boolean array that is encoded so the first dimension in bounds is the most significant for an index
+     * @param bounds the limits of the dimensions for the space that data refers to
      * @return a packed short[] that should, in most circumstances, be passed to unpack() when it needs to be used.
      */
     public EWAHCompressedBitmap32 pack(boolean[] data, int[] bounds)
     {
         if(data == null || data.length == 0)
-            throw new ArrayIndexOutOfBoundsException("RegionPacker.pack() must be given a non-empty array");
+            throw new UnsupportedOperationException("RegionPacker.pack() must be given a non-empty array");
         validateBounds(bounds);
 
         EWAHCompressedBitmap32 packing = new EWAHCompressedBitmap32();
@@ -241,6 +245,23 @@ public class RegionPacker {
     }
 
     /**
+     * When you have some data in a multi-dimensional boolean array, you can pass it to a LinearData constructor and
+     * pass that LinearData to this method if you want to manipulate it with this class. This variant of pack() handles
+     * bounds automatically, using the LinearData's stored bounds (which typically match the dimension lengths for the
+     * multi-dimensional boolean array that was passed to the LinearData constructor) to determine whether positions are
+     * in the encoded area or not. Returns a compressed bitmap from the JavaEWAH library, EWAHCompressedBitmap32, which
+     * can be passed to most methods of this class (RegionPacker).
+     * @param linear a LinearData object that can be constructed using a multi-dimensional boolean array
+     * @return a packed bitmap
+     */
+    public EWAHCompressedBitmap32 pack(LinearData linear)
+    {
+        if(linear == null || linear.data == null || linear.data.length == 0)
+            throw new UnsupportedOperationException("RegionPacker.pack() was given an invalid LinearData object");
+        return pack(linear.data, linear.bounds);
+    }
+
+    /**
      * Decompresses a packed bitmap returned by pack(), as described in
      * the {@link RegionPacker} class documentation. This returns a boolean[] that stores the same values that were
      * packed if the overload of pack() taking a boolean[] was used.
@@ -252,7 +273,7 @@ public class RegionPacker {
     public boolean[] unpack(EWAHCompressedBitmap32 packed, final int[] bounds)
     {
         if(packed == null)
-            throw new ArrayIndexOutOfBoundsException("RegionPacker.unpack() must be given a non-null Region");
+            throw new UnsupportedOperationException("RegionPacker.unpack() must be given a non-null Region");
 
         int b = validateBounds(bounds);
 
@@ -271,6 +292,10 @@ public class RegionPacker {
                 unpacked[idx] = true;
         }
         return unpacked;
+    }
+    public LinearData unpackLinearData(EWAHCompressedBitmap32 packed, final int[] bounds)
+    {
+        return new LinearData(unpack(packed, bounds), bounds);
     }
 
     /*

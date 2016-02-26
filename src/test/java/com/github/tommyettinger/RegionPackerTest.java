@@ -33,9 +33,6 @@ public class RegionPackerTest {
         assertEquals(dataCross, doubleNegative);
     }
 
-    public static int FOV_RANGE = 12;
-    public static Radius RADIUS = Radius.SQUARE;
-
     public void printBits16(int n) {
         for (int i = 0x8000; i > 0; i >>= 1)
             System.out.print((n & i) > 0 ? 1 : 0);
@@ -283,6 +280,18 @@ public class RegionPackerTest {
         fromBounded(bounds, 0);
         fromBounded(bounds, 663);
         fromBounded(bounds, 3187);
+    }
+
+    @Test
+    public void testLinear()
+    {
+        int[][] foo = new int[8][8];
+        foo[1][1] = 1;
+        foo[2][1] = 2;
+        foo[2][2] = 4;
+        LinearData l = new LinearData(foo, Checks.greaterInt(1), 8);
+        EWAHCompressedBitmap32 packed = rp.pack(l);
+        print2D(packed);
     }
 
 }

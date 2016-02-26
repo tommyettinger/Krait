@@ -1,6 +1,8 @@
 package com.github.tommyettinger;
 
 /**
+ * Contains various static utility methods for converting arrays to arrays of other types. Mainly useful internally,
+ * such as in the caches for smaller space-filling curves.
  * Created by Tommy Ettinger on 2/15/2016.
  */
 public class Conversion {
@@ -114,26 +116,26 @@ public class Conversion {
 
     public static int[] toIntsInPlace(int[] receiving, byte[] values)
     {
-        for (int i = 0; i < values.length; i++) {
+        for (int i = 0; i < values.length && i < receiving.length; i++) {
             receiving[i] = (MASK16 & values[i]);
         }
         return receiving;
     }
     public static int[] toIntsInPlace(int[] receiving, short[] values)
     {
-        for (int i = 0; i < values.length; i++) {
+        for (int i = 0; i < values.length && i < receiving.length; i++) {
             receiving[i] = (MASK16 & values[i]);
         }
         return receiving;
     }
     public static int[] toIntsInPlace(int[] receiving, int[] values)
     {
-        System.arraycopy(values, 0, receiving, 0, values.length);
+        System.arraycopy(values, 0, receiving, 0, Math.min(values.length, receiving.length));
         return receiving;
     }
     public static int[] toIntsInPlace(int[] receiving, long[] values)
     {
-        for (int i = 0; i < values.length; i++) {
+        for (int i = 0; i < values.length && i < receiving.length; i++) {
             receiving[i] = (int)values[i];
         }
         return receiving;
