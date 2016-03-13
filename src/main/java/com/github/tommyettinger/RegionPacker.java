@@ -946,10 +946,10 @@ public class RegionPacker {
      * Returns a new packed bitmap and does not modify packed.
      * @param packed a packed bitmap returned by pack() or a similar method
      * @param bounds the bounds of the positions to expand; out-of-bounds cells count as "on" here
-     * @return a packed bitmap that encodes "on" for cells that are the single-width "filling" between two cells along
+     * @return a packed bitmap that encodes "on" for cells that are the single-width "gap" between two cells along
      * one line in packed.
      */
-    public EWAHCompressedBitmap32 filling(EWAHCompressedBitmap32 packed, int[] bounds)
+    public EWAHCompressedBitmap32 gap(EWAHCompressedBitmap32 packed, int[] bounds)
     {
         if(packed == null || packed.isEmpty())
         {
@@ -978,11 +978,11 @@ public class RegionPacker {
      * purpose. Returns a new packed bitmap and does not modify packed.
      * @param packed a packed bitmap returned by pack() or a similar method
      * @param bounds the bounds of the positions to expand; out-of-bounds cells count as "on" here
-     * @param depth the distance that must be met exactly between "on" cells for this to count a cell as "filling"
-     * @return a packed bitmap that encodes "on" for cells that are the single-width "filling" between two cells along
+     * @param depth the distance that must be met exactly between "on" cells for this to count a cell as "gap"
+     * @return a packed bitmap that encodes "on" for cells that are the single-width "gap" between two cells along
      * one line in packed.
      */
-    public EWAHCompressedBitmap32 filling(EWAHCompressedBitmap32 packed, int[] bounds, int depth)
+    public EWAHCompressedBitmap32 gap(EWAHCompressedBitmap32 packed, int[] bounds, int depth)
     {
         if(packed == null || packed.isEmpty())
         {
@@ -1016,7 +1016,7 @@ public class RegionPacker {
      * @param metric the distance metric to use; a Metric enum from this package
      * @return a packed bitmap that encodes "on" for cells that were pushed from the edge of packed's "on" cells
      */
-    public EWAHCompressedBitmap32 filling(EWAHCompressedBitmap32 packed, int[] bounds, Metric metric)
+    public EWAHCompressedBitmap32 gap(EWAHCompressedBitmap32 packed, int[] bounds, Metric metric)
     {
         if(packed == null || packed.isEmpty())
         {
@@ -1042,17 +1042,17 @@ public class RegionPacker {
      * Finds the area that has a span of cells exactly depth in length encoded in packed on two opposing sides, without
      * including the cells in packed. Searches the area around each "on" position in packed to cover an n-dimensional
      * region based on metric, either diamond/octahedron/cross polytope for MANHATTAN or square/cube/hypercube for any
-     * other (for 2D/3D/higher dimensions). The cells that are not in packed but have a distance of 1 using the given metric from two "on"
-     * positions along the same line are all that is included in the result. Cells outside of bounds count as "on" for
-     * this purpose.
+     * other (for 2D/3D/higher dimensions). The cells that are not in packed but have a distance of 1 using the given
+     * metric from two "on" positions along the same line are all that is included in the result. Cells outside of
+     * bounds count as "on" for this purpose.
      * Returns a new packed bitmap and does not modify packed.
      * @param packed a packed bitmap returned by pack() or a similar method
      * @param bounds the bounds of the positions to expand; out-of-bounds cells count as "on" here
-     * @param depth the distance that must be met exactly between "on" cells for this to count a cell as "filling"
+     * @param depth the distance that must be met exactly between "on" cells for this to count a cell as "gap"
      * @param metric the distance metric to use; a Metric enum from this package
      * @return a packed bitmap that encodes "on" for cells that were pushed from the edge of packed's "on" cells
      */
-    public EWAHCompressedBitmap32 filling(EWAHCompressedBitmap32 packed, int[] bounds, int depth, Metric metric)
+    public EWAHCompressedBitmap32 gap(EWAHCompressedBitmap32 packed, int[] bounds, int depth, Metric metric)
     {
         if(packed == null || packed.isEmpty())
         {

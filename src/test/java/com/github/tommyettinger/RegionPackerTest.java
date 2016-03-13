@@ -201,10 +201,10 @@ public class RegionPackerTest {
         //print2D(dc2);
         //System.out.println();
 
-        EWAHCompressedBitmap32 corners = rp.filling(dataCross, crossBounds, Metric.CHEBYSHEV);
+        EWAHCompressedBitmap32 corners = rp.gap(dataCross, crossBounds, Metric.CHEBYSHEV);
         print2D(corners);
         System.out.println();
-        corners = rp.filling(dataCross, crossBounds, 2, Metric.CHEBYSHEV);
+        corners = rp.gap(dataCross, crossBounds, 2, Metric.CHEBYSHEV);
         print2D(corners);
         System.out.println();
         printOverlay(dataCross, corners);

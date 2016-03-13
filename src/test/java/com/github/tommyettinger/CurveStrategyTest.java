@@ -76,6 +76,7 @@ public class CurveStrategyTest {
         printlnPoint("Hilbert Order 10 position 4", pt);
         pt = hilbert.point(-1);
         printlnPoint("Hilbert Order 10 position end", pt);
+
         /*
         hilbert = new Hilbert2DStrategy(2000);
         System.out.println("Max distance: " + Long.toHexString(hilbert.maxDistance));
@@ -93,12 +94,11 @@ public class CurveStrategyTest {
     //201614111
 
     //195763046
-    @Test
     public void testHilbert2DSpeed()
     {
         long time = System.nanoTime(), l = 0L;
         //System.out.println("Hilbert Curve 2D");
-        Hilbert2DStrategy hilbert = new Hilbert2DStrategy(123);
+        Hilbert2DStrategy hilbert = new Hilbert2DStrategy(0x200);
         //System.out.println("Max distance: " + Long.toHexString(hilbert.maxDistance));
         int[] pt = hilbert.point(0);
         //printlnPoint("Hilbert Order 7 position 0", pt);
@@ -113,7 +113,7 @@ public class CurveStrategyTest {
             pt = hilbert.point(i);
             l ^= pt[0] ^ pt[1];
         }
-
+/*
         hilbert = new Hilbert2DStrategy(129);
         //System.out.println("Max distance: " + Long.toHexString(hilbert.maxDistance));
         pt = hilbert.point(0);
@@ -145,9 +145,71 @@ public class CurveStrategyTest {
             pt = hilbert.point(i);
             l ^= pt[0] ^ pt[1];
         }
-
+*/
         System.out.println((System.nanoTime() - time) + ", " + l);
     }
+    public void testHilbert3DSpeed()
+    {
+        long time = System.nanoTime(), l = 0L;
+        //System.out.println("Hilbert Curve 2D");
+        HilbertGeneralStrategy hilbert = new HilbertGeneralStrategy(3, 0x40);
+        //System.out.println("Max distance: " + Long.toHexString(hilbert.maxDistance));
+        int[] pt = hilbert.point(0);
+        //printlnPoint("Hilbert Order 7 position 0", pt);
+        pt = hilbert.point(1);
+        //printlnPoint("Hilbert Order 7 position 1", pt);
+        pt = hilbert.point(4);
+        //printlnPoint("Hilbert Order 7 position 4", pt);
+        pt = hilbert.point(-1);
+        //printlnPoint("Hilbert Order 7 position end", pt);
+
+        for (int i = 0; i < hilbert.maxDistance; i++) {
+            pt = hilbert.point(i);
+            l ^= pt[0] ^ pt[1];
+        }
+/*
+        hilbert = new Hilbert2DStrategy(129);
+        //System.out.println("Max distance: " + Long.toHexString(hilbert.maxDistance));
+        pt = hilbert.point(0);
+        //printlnPoint("Hilbert Order 8 position 0", pt);
+        pt = hilbert.point(1);
+        //printlnPoint("Hilbert Order 8 position 1", pt);
+        pt = hilbert.point(4);
+        //printlnPoint("Hilbert Order 8 position 4", pt);
+        pt = hilbert.point(-1);
+        //printlnPoint("Hilbert Order 8 position end", pt);
+
+        for (int i = 0; i < hilbert.maxDistance; i++) {
+            pt = hilbert.point(i);
+            l ^= pt[0] ^ pt[1];
+        }
+
+        hilbert = new Hilbert2DStrategy(1000);
+        //System.out.println("Max distance: " + Long.toHexString(hilbert.maxDistance));
+        pt = hilbert.point(0);
+        //printlnPoint("Hilbert Order 10 position 0", pt);
+        pt = hilbert.point(1);
+        //printlnPoint("Hilbert Order 10 position 1", pt);
+        pt = hilbert.point(4);
+        //printlnPoint("Hilbert Order 10 position 4", pt);
+        pt = hilbert.point(-1);
+        //printlnPoint("Hilbert Order 10 position end", pt);
+
+        for (int i = 0; i < hilbert.maxDistance; i++) {
+            pt = hilbert.point(i);
+            l ^= pt[0] ^ pt[1];
+        }
+*/
+        System.out.println((System.nanoTime() - time) + ", " + l);
+    }
+
+    @Test
+    public void testSpeed()
+    {
+        testHilbert2DSpeed();
+        testHilbert3DSpeed();
+    }
+
     @Test
     public void testHilbert3D()
     {
@@ -334,8 +396,8 @@ public class CurveStrategyTest {
             if(i != d)
             {
                 ph.distance(pt);
-                printPoint(pt);
-                System.out.println(" -> " + i + " but gives " + d);
+                //printPoint(pt);
+                //System.out.println(" -> " + i + " but gives " + d);
             }
         }
 

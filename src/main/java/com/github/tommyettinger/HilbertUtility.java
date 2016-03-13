@@ -174,8 +174,8 @@ public class HilbertUtility {
      * Source: https://github.com/cortesi/scurve
      * @param order the number of bits used for a side length, also the order of this Hilbert curve
      * @param dimension the number of dimensions, all of equal length; should be between 2 and 31 inclusive
-     * @param distance a int distance
-     * @return a int array of coordinates representing a point
+     * @param distance an int distance
+     * @return an int array of coordinates representing a point
      */
     public static int[] distanceToPoint(int order, int dimension, int distance) {
         int hwidth = order * dimension, e = 0, d = 0, w, l, b, w2;
@@ -205,8 +205,8 @@ public class HilbertUtility {
      * @param modifying the int array of coordinates to modify
      * @param order the number of bits used for a side length, also the order of this Hilbert curve
      * @param dimension the number of dimensions, all of equal length; should be between 2 and 31 inclusive
-     * @param distance a int distance
-     * @return a int array of coordinates representing a point, the same value assigned to modifying
+     * @param distance an int distance
+     * @return an int array of coordinates representing a point, the same value assigned to modifying
      */
     public static int[] distanceToPoint(int[] modifying, int order, int dimension, int distance) {
         int hwidth = order * dimension, e = 0, d = 0, w, l, b, w2;
@@ -229,6 +229,74 @@ public class HilbertUtility {
     }
 
     /**
+     * Takes a distance to travel along a Hilbert curve with the specified dimension count and order (number of bits
+     * needed for the length of a side), and returns a int array representing the position in n-dimensional space that
+     * corresponds to the point at that distance on this Hilbert curve. This variant does not use a lookup table.
+     * <br>
+     * Source: https://github.com/cortesi/scurve
+     * @param order the number of bits used for a side length, also the order of this Hilbert curve
+     * @param dimension the number of dimensions, all of equal length; should be between 2 and 31 inclusive
+     * @param distance an int distance
+     * @return an int array of coordinates representing a point
+     */
+    public static int[] distanceToPoint(int order, int dimension, int distance, int[] offsets) {
+        int hwidth = order * dimension, e = 0, d = 0, w, l, b, w2;
+        int[] p = new int[dimension];
+        for (int i = 0; i < order; i++) {
+            //        w = utils.bitrange(h, hwidth, i*dimension, i*dimension+dimension)
+            //x >> (width-end) & ((2**(end-start))-1)
+            w = distance >>> (hwidth - (i * dimension + dimension))
+                    & ((1 << ((i * dimension + dimension) - i * dimension)) -1);
+            l = grayCode(w);
+            l = inverseTransform(e, d, dimension, l);
+            for (int j = 0; j < dimension; j++) {
+                b = l >>> (dimension - (j + 1)) & 1;
+                p[j] ^= (-b ^ p[j]) & (1 << (order - 1 - i)); //(order - 1 - i)
+            }
+            e ^= rotateLeft(entry(w), d+1, dimension);
+            d = (d + direction(w, dimension) + 1)% dimension;
+        }
+        for (int o = 0; o < dimension; o++) {
+            p[o] += offsets[o];
+        }
+        return p;
+    }
+    /**
+     * Takes a distance to travel along a Hilbert curve with the specified dimension count and order (number of bits
+     * needed for the length of a side), and returns a int array representing the position in n-dimensional space that
+     * corresponds to the point at that distance on this Hilbert curve. This variant does not use a lookup table.
+     * <br>
+     * Source: https://github.com/cortesi/scurve
+     * @param modifying the int array of coordinates to modify
+     * @param order the number of bits used for a side length, also the order of this Hilbert curve
+     * @param dimension the number of dimensions, all of equal length; should be between 2 and 31 inclusive
+     * @param distance an int distance
+     * @return an int array of coordinates representing a point, the same value assigned to modifying
+     */
+    public static int[] distanceToPoint(int[] modifying, int order, int dimension, int distance, int[] offsets) {
+        int hwidth = order * dimension, e = 0, d = 0, w, l, b, w2;
+        Arrays.fill(modifying, 0);
+        for (int i = 0; i < order; i++) {
+            //        w = utils.bitrange(h, hwidth, i*dimension, i*dimension+dimension)
+            //x >> (width-end) & ((2**(end-start))-1)
+            w = distance >>> (hwidth - (i * dimension + dimension))
+                    & ((1 << ((i * dimension + dimension) - i * dimension)) -1);
+            l = grayCode(w);
+            l = inverseTransform(e, d, dimension, l);
+            for (int j = 0; j < dimension; j++) {
+                b = l >>> (dimension - (j + 1)) & 1;
+                modifying[j] ^= (-b ^ modifying[j]) & (1 << (order - 1 - i)); //(order - 1 - i)
+            }
+            e ^= rotateLeft(entry(w), d+1, dimension);
+            d = (d + direction(w, dimension) + 1)% dimension;
+        }
+        for (int o = 0; o < dimension; o++) {
+            modifying[o] += offsets[o];
+        }
+        return modifying;
+    }
+
+    /**
      * Finds the distance along the Hilbert Curve for a point specified as an array or vararg of coordinates, which can
      * have any number of dimensions (equal to the dimension parameter) between 2 and 31. The Hilbert Curve used for
      * the distance will have a side length equal to 2^order; order must be greater than 0.
@@ -239,13 +307,44 @@ public class HilbertUtility {
      * @param coordinates an array or vararg of int coordinates, starting with x, then y, etc. up to dimension length
      * @return corresponding distance
      */
-    public static int pointToDistance(int order, int dimension, int... coordinates)
+    public static int pointToDistance(int order, int dimension, int[] coordinates)
     {
         int h = 0, e = 0, d = 0, l, w, b;
         for (int i = 0; i < order; i++) {
             l = 0;
             for (int j = 0; j < dimension; j++) {
                 b = coordinates[dimension - j - 1] >>> (order - (i + 1)) & 1;
+                l |= b << j;
+            }
+            l = transform(e, d, dimension, l);
+            w = grayCode(l);
+            e ^= rotateLeft(entry(w), d + 1, dimension);
+            d = (d + direction(w, dimension) + 1) % dimension;
+            h = (h << dimension) | w;
+        }
+        return h;
+    }
+    /**
+     * Finds the distance along the Hilbert Curve for a point specified as an array or vararg of coordinates, which can
+     * have any number of dimensions (equal to the dimension parameter) between 2 and 31. The Hilbert Curve used for
+     * the distance will have a side length equal to 2^order; order must be greater than 0.
+     * <br>
+     * Source: https://github.com/cortesi/scurve
+     * @param order the number of bits used for a side length, also the order of this Hilbert curve
+     * @param dimension the number of dimensions, all of equal length; should be between 2 and 31 inclusive
+     * @param coordinates an array or vararg of int coordinates, starting with x, then y, etc. up to dimension length
+     * @return corresponding distance
+     */
+    public static int pointToDistance(int order, int dimension, int[] coordinates, int[] offsets, int side)
+    {
+        int h = 0, e = 0, d = 0, l, w, b, c;
+        for (int i = 0; i < order; i++) {
+            l = 0;
+            for (int j = 0; j < dimension; j++) {
+                c = coordinates[dimension - j - 1] - offsets[dimension - j - 1];
+                if(c < 0 || c >= side)
+                    return -1;
+                b = c >>> (order - (i + 1)) & 1;
                 l |= b << j;
             }
             l = transform(e, d, dimension, l);

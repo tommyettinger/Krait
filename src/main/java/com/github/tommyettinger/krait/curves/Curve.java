@@ -1,42 +1,41 @@
-package com.github.tommyettinger;
+package com.github.tommyettinger.krait.curves;
 
 /**
- * A technique for translating 1-dimensional distances into n-dimensional positions using a space-filling curve.
- * Created by Tommy Ettinger on 2/11/2016.
+ * Created by Tommy Ettinger on 3/12/2016.
  */
-public abstract class CurveStrategy {
+public abstract class Curve {
+    /*
+    public interface Point {
+        int[] point(int distance);
+    }
+    public interface Alter {
+        int[] alter(int[] coordinate, int distance);
+    }
+    public interface Coordinate {
+        int coordinate(int distance, int dimension);
+    }
+    public interface Distance {
+        int distance(int... coordinates);
+    }
+    */
+    /**
+     * An array of dimension lengths, which are often (but not always) all equal. For a 5x5x5 space-filling curve, this
+     * would have a value of 5, 5, 5. For a 32x32x16 space-filing curve, this would have a value of 32, 32, 16.
+     */
+    public int[] dimensionality;
+
+    /**
+     * An array of offsets per dimension, which push the space this curve fills in some positive or negative
+     * direction(s). This must have equal length to dimensionality.
+     */
+    public int[] offsets;
+
     /**
      * The exclusive upper bound for distances that can be given to this CurveStrategy. For a space-filling curve that
      * covers a 16x16 grid of 256 points, this variable should be 256. If the space-filling curve covers a 5x5x5 area of
      * 125 points, then this variable should be 125, and so on.
      */
     public int maxDistance;
-    /**
-     * An array of dimension lengths, which are often (but not always) all equal. For a 5x5x5 space-filling curve, this
-     * would have a value of 5, 5, 5. For a 32x32x16 space-filing curve, this would have a value of 32, 32, 16.
-     */
-    public int[] dimensionality;
-    /**
-     * Should be true if this CurveStrategy pre-calculates its items, which shouldn't be done if maxDistance is higher
-     * than about 2^24, depending on hardware. Storing each dimension of a 2^24 length curve uses 64 MB of RAM for each
-     * int array, plus another 64 MB for the distances. Going larger than that gets into very difficult-to-justify
-     * territory of memory usage, especially since the initial caching contributes to startup time.
-     */
-    public boolean stored;
-
-    /**
-     * The number of bytes required to represent the maximum distance; for now, always 1, 2, or 4.
-     */
-    public int distanceByteSize;
-
-    protected int calculateByteSize()
-    {
-        if(maxDistance <= 0x100L)
-            return 1;
-        if(maxDistance <= 0x10000L)
-            return 2;
-        return 4;
-    }
 
     /**
      * Given a distance to travel along this space-filling curve, gets the corresponding point as an array of int
